@@ -1,0 +1,20 @@
+# Database files (too large + private)
+*.db
+chromadb/
+
+# Your personal tone profile (private)
+backend/tone_profile.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Virtual environment if you create one
+venv/
+env/
+
+# Windows stuff
+Thumbs.db
+desktop.ini
