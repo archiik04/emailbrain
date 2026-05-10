@@ -11,7 +11,7 @@ from agents.draft import draft_reply, build_tone_profile
 from agents.followup import scan_followups, resolve_followup, generate_nudge
 from ingestion import sync, poll
 
-# ── Request models ─────────────────────────────────────────────
+# Request models
 class DraftRequest(BaseModel):
     subject: str
     sender: str
@@ -34,7 +34,7 @@ class NudgeRequest(BaseModel):
 class ResolveRequest(BaseModel):
     message_id: str
 
-# ── App setup ──────────────────────────────────────────────────
+# App setup 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Email Brain API starting up...")
@@ -52,7 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routes ─────────────────────────────────────────────────────
+# Routes
 
 @app.get("/")
 def root():

@@ -18,3 +18,7 @@ env/
 # Windows stuff
 Thumbs.db
 desktop.ini
+
+# Frontend dependencies (too large, reinstalled via npm install)
+frontend/node_modules/
+frontend/build/
