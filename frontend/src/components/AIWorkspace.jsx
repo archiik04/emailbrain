@@ -4,8 +4,6 @@ import {
   CalendarRange,
   FileText,
   MessageSquareText,
-  Sparkles,
-  WandSparkles,
 } from "lucide-react";
 
 const toneOptions = ["Professional", "Friendly", "Casual"];
@@ -121,7 +119,7 @@ export default function AIWorkspace({
   if (!email || !insights) {
     return (
       <div className="flex h-full min-h-[520px] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-8 text-center text-sm leading-6 text-white/42">
-        Select a thread to open the AI workspace. You’ll get a clean summary,
+        Select a thread to open the AI workspace. You'll get a clean summary,
         action cues, time signals, and a ready-to-edit draft in one place.
       </div>
     );
@@ -157,7 +155,6 @@ export default function AIWorkspace({
               onClick={onGenerateDraft}
               className="inline-flex items-center gap-2 rounded-2xl border border-accent/25 bg-accent px-4 py-3 text-sm font-medium text-white shadow-glow transition hover:brightness-110"
             >
-              <WandSparkles className="h-4 w-4" />
               {isDraftLoading ? "Generating..." : "Generate Draft"}
             </button>
             <button
@@ -182,10 +179,7 @@ export default function AIWorkspace({
         <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
           <div className="space-y-4">
             <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
-                <Sparkles className="h-4 w-4 text-accent" />
-                AI Summary
-              </div>
+              <div className="mb-3 text-sm font-medium text-white">AI Summary</div>
               <p className="text-sm leading-7 text-white/58">{activeSummary}</p>
             </div>
 

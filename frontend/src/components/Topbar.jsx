@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
 
 export default function Topbar({ title, subtitle, sourceLabel, statPills = [] }) {
   return (
@@ -10,8 +9,7 @@ export default function Topbar({ title, subtitle, sourceLabel, statPills = [] })
       transition={{ duration: 0.35 }}
     >
       <div>
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/55">
-          <Sparkles className="h-3.5 w-3.5 text-accent" />
+        <div className="mb-3 inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/55">
           AI-first inbox orchestration
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-white">

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function SearchBar({
   value,
@@ -17,9 +17,6 @@ export default function SearchBar({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.05 }}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/[0.16] text-accent">
-          <Sparkles className="h-[18px] w-[18px]" />
-        </div>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}

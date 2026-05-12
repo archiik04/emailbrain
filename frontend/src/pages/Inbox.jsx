@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Inbox as InboxIcon, Sparkles } from "lucide-react";
+import { Inbox as InboxIcon } from "lucide-react";
 import { fetchInbox, generateDraft } from "../api/inboxApi";
 import AIWorkspace from "../components/AIWorkspace";
 import EmailCard from "../components/EmailCard";
@@ -20,7 +20,7 @@ const defaultDraft = (email) => {
 
   return `Hi ${email.sender.split("<")[0].trim() || "there"},
 
-Thanks for the note on "${email.subject}". I reviewed the thread and I’m following up with the next step shortly.
+Thanks for the note on "${email.subject}". I reviewed the thread and I'm following up with the next step shortly.
 
 Best,
 You`;
@@ -80,7 +80,9 @@ export default function InboxPage() {
       setErrorMessage(
         result.usingMock
           ? "Backend unavailable, so EmailBrain is showing sample data until the API responds."
-          : ""
+          : result.emails.length === 0
+            ? "Connected to the backend, but it did not return any inbox threads yet."
+            : ""
       );
 
       if (result.emails.length) {
@@ -207,13 +209,12 @@ export default function InboxPage() {
 
                 {!loading && filteredEmails.length === 0 ? (
                   <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] px-8 text-center">
-                    <Sparkles className="h-10 w-10 text-accent/70" />
                     <h3 className="mt-5 text-lg font-semibold text-white">
                       No threads match that prompt
                     </h3>
                     <p className="mt-2 max-w-sm text-sm leading-6 text-white/42">
-                      Try a broader phrasing like “recruiters”, “deadlines”, or
-                      “follow up”.
+                      Try a broader phrasing like "recruiters", "deadlines", or
+                      "follow up".
                     </p>
                   </div>
                 ) : null}

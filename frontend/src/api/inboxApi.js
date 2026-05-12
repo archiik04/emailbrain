@@ -3,8 +3,8 @@ import { mockEmails } from "../data/mockInbox";
 
 const API_CANDIDATES = [
   process.env.REACT_APP_API_URL,
-  "http://127.0.0.1:8000",
   "http://127.0.0.1:8765",
+  "http://127.0.0.1:8000",
 ].filter(Boolean);
 
 let activeBaseUrl = process.env.REACT_APP_API_URL || null;
@@ -99,9 +99,14 @@ const requestWithFallback = async (config) => {
     try {
       const response = await axios({
         baseURL,
-        timeout: 6000,
+        timeout: 45000,
         ...config,
       });
+
+      const contentType = response.headers?.["content-type"] || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Non-JSON response from ${baseURL}`);
+      }
 
       activeBaseUrl = baseURL;
       return response.data;
@@ -124,7 +129,11 @@ export const fetchInbox = async () => {
       url: "/inbox",
     });
 
-    const emails = Array.isArray(data?.emails) ? data.emails : [];
+    if (!Array.isArray(data?.emails)) {
+      throw new Error("Inbox response did not contain an emails array.");
+    }
+
+    const emails = data.emails;
 
     return {
       emails: emails.map(normalizeEmail),
@@ -159,6 +168,10 @@ export const generateDraft = async (email, tone = "Professional") => {
         tone_override: toneMap[tone] || "formal",
       },
     });
+
+    if (typeof data?.draft !== "string") {
+      throw new Error("Draft response did not contain a draft string.");
+    }
 
     return data?.draft || buildFallbackDraft(email, tone);
   } catch (error) {

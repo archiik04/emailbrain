@@ -1,7 +1,10 @@
+import os
+import sys
+
 import ollama
-from sqlalchemy.orm import Session
 from sqlalchemy import select
-import sys, os
+from sqlalchemy.orm import Session
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.db import Email, engine
 
@@ -21,26 +24,59 @@ Body: {body}
 
 Respond with ONLY a single number 1-10. Nothing else."""
 
+
 def score_email(subject: str, sender: str, body: str) -> int:
     """Ask Mistral to score one email's urgency."""
     try:
         response = ollama.chat(
             model="mistral",
-            messages=[{
-                "role": "user",
-                "content": TRIAGE_PROMPT.format(
-                    sender=sender,
-                    subject=subject,
-                    body=body[:500]  # first 500 chars is enough to judge urgency
-                )
-            }]
+            messages=[
+                {
+                    "role": "user",
+                    "content": TRIAGE_PROMPT.format(
+                        sender=sender,
+                        subject=subject,
+                        body=body[:500],
+                    ),
+                }
+            ],
         )
         raw = response["message"]["content"].strip()
-        score = int(''.join(filter(str.isdigit, raw))[:1] or "5")
-        return max(1, min(10, score))  # clamp between 1-10
-    except Exception as e:
-        print(f"  Scoring failed: {e}")
-        return 5  # default to medium if anything goes wrong
+        score = int("".join(filter(str.isdigit, raw))[:1] or "5")
+        return max(1, min(10, score))
+    except Exception as exc:
+        print(f"  Scoring failed: {exc}")
+        return 5
+
+
+def serialize_email(email: Email) -> dict:
+    preview = (email.body or "").replace("\n", " ").strip()[:160]
+    return {
+        "message_id": email.message_id,
+        "subject": email.subject,
+        "sender": email.sender,
+        "date": email.date.isoformat() if email.date else "",
+        "score": email.triage_score,
+        "body": email.body or "",
+        "preview": preview,
+    }
+
+
+def fetch_scored_inbox(limit: int = 30):
+    """
+    Return already-scored inbox emails quickly so the UI can load fast.
+    """
+    with Session(engine) as session:
+        emails = session.execute(
+            select(Email)
+            .where(Email.is_sent == False)
+            .where(Email.triage_score > 0)
+            .order_by(Email.triage_score.desc(), Email.date.desc())
+            .limit(limit)
+        ).scalars().all()
+
+    return [serialize_email(email) for email in emails]
+
 
 def run_triage(limit: int = 50):
     """
@@ -50,7 +86,6 @@ def run_triage(limit: int = 50):
     print(f"\nRunning triage on up to {limit} emails...")
 
     with Session(engine) as session:
-        # get most recent emails that haven't been scored yet
         emails = session.execute(
             select(Email)
             .where(Email.triage_score == 0)
@@ -64,28 +99,22 @@ def run_triage(limit: int = 50):
             return []
 
         results = []
-        for i, email in enumerate(emails):
+        for index, email in enumerate(emails):
             score = score_email(email.subject, email.sender, email.body)
             email.triage_score = score
-            results.append({
-                "message_id":  email.message_id,
-                "subject":     email.subject,
-                "sender":      email.sender,
-                "date":        email.date.isoformat() if email.date else "",
-                "score":       score,
-            })
-            print(f"  [{i+1}/{len(emails)}] Score {score}/10 — {email.subject[:50]}")
+            results.append(serialize_email(email))
+            print(f"  [{index + 1}/{len(emails)}] Score {score}/10 - {email.subject[:50]}")
 
         session.commit()
 
-    # sort by score descending so highest urgency is first
-    results.sort(key=lambda x: x["score"], reverse=True)
+    results.sort(key=lambda item: item["score"], reverse=True)
     print(f"\nTriage complete! Top email: {results[0]['subject'][:50]}")
     return results
+
 
 if __name__ == "__main__":
     scored = run_triage(limit=20)
     print("\n--- YOUR INBOX BY URGENCY ---")
-    for e in scored:
-        bar = "█" * e["score"] + "░" * (10 - e["score"])
-        print(f"  {e['score']}/10 {bar}  {e['subject'][:45]}")
+    for email in scored:
+        bar = "#" * email["score"] + "-" * (10 - email["score"])
+        print(f"  {email['score']}/10 {bar}  {email['subject'][:45]}")

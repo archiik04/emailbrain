@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import {
-  BrainCircuit,
   FilePenLine,
   Inbox,
   Search,
@@ -24,10 +23,7 @@ export default function Sidebar() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/20 text-accent shadow-glow">
-            <BrainCircuit className="h-5 w-5" />
-          </div>
+        <div className="flex items-center">
           <div className="hidden xl:block">
             <p className="text-sm font-semibold tracking-wide text-white">
               EmailBrain
