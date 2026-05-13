@@ -17,7 +17,15 @@ app = FastAPI(title="Email Brain API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:1420", "http://localhost:3000", "tauri://localhost"],
+    allow_origins=[
+        "http://localhost:1420",
+        "http://127.0.0.1:1420",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "tauri://localhost",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -30,6 +38,11 @@ app.include_router(followups_router)
 @app.get("/")
 def root():
     return {"status": "Email Brain v2 running"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn

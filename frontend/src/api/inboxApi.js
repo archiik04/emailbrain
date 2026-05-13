@@ -1,13 +1,4 @@
-import axios from "axios";
-import { mockEmails } from "../data/mockInbox";
-
-const API_CANDIDATES = [
-  process.env.REACT_APP_API_URL,
-  "http://127.0.0.1:8765",
-  "http://127.0.0.1:8000",
-].filter(Boolean);
-
-let activeBaseUrl = process.env.REACT_APP_API_URL || null;
+import { requestJson } from "./client";
 
 const urgencyFromScore = (score = 0) => {
   if (score >= 8) {
@@ -67,87 +58,18 @@ const normalizeEmail = (email, index = 0) => {
   };
 };
 
-const buildFallbackDraft = (email, tone) => {
-  const greeting = tone === "Casual" ? "Hey" : "Hi";
-  const closing =
-    tone === "Professional"
-      ? "Best regards,"
-      : tone === "Friendly"
-        ? "Thanks so much,"
-        : "Best,";
-
-  return `${greeting} ${email.sender.split("<")[0].trim() || "there"},
-
-Thanks for reaching out about "${email.subject}". I reviewed the thread and I'm aligned on the next step.
-
-${email.urgency === "High"
-    ? "I can prioritize this today and will follow up with a clear update shortly."
-    : "I can take a look and follow up with a clear update soon."}
-
-${closing}
-You`;
-};
-
-const requestWithFallback = async (config) => {
-  const candidates = activeBaseUrl
-    ? [activeBaseUrl, ...API_CANDIDATES.filter((url) => url !== activeBaseUrl)]
-    : API_CANDIDATES;
-
-  let lastError;
-
-  for (const baseURL of candidates) {
-    try {
-      const response = await axios({
-        baseURL,
-        timeout: 45000,
-        ...config,
-      });
-
-      const contentType = response.headers?.["content-type"] || "";
-      if (!contentType.includes("application/json")) {
-        throw new Error(`Non-JSON response from ${baseURL}`);
-      }
-
-      activeBaseUrl = baseURL;
-      return response.data;
-    } catch (error) {
-      lastError = error;
-
-      if (error.response && error.response.status < 500) {
-        throw error;
-      }
-    }
-  }
-
-  throw lastError;
-};
-
 export const fetchInbox = async () => {
-  try {
-    const data = await requestWithFallback({
-      method: "get",
-      url: "/inbox",
-    });
+  const result = await requestJson({
+    method: "get",
+    url: "/inbox",
+    validator: (data) => Array.isArray(data?.emails),
+  });
 
-    if (!Array.isArray(data?.emails)) {
-      throw new Error("Inbox response did not contain an emails array.");
-    }
-
-    const emails = data.emails;
-
-    return {
-      emails: emails.map(normalizeEmail),
-      source: "api",
-      usingMock: false,
-    };
-  } catch (error) {
-    return {
-      emails: mockEmails.map(normalizeEmail),
-      source: "mock",
-      usingMock: true,
-      error,
-    };
-  }
+  return {
+    emails: result.data.emails.map(normalizeEmail),
+    source: result.data.source || "api",
+    baseUrl: result.baseUrl,
+  };
 };
 
 const toneMap = {
@@ -157,24 +79,20 @@ const toneMap = {
 };
 
 export const generateDraft = async (email, tone = "Professional") => {
-  try {
-    const data = await requestWithFallback({
-      method: "post",
-      url: "/drafts",
-      data: {
-        subject: email.subject,
-        sender: email.sender,
-        body: email.body || email.preview || "",
-        tone_override: toneMap[tone] || "formal",
-      },
-    });
+  const result = await requestJson({
+    method: "post",
+    url: "/drafts",
+    data: {
+      subject: email.subject,
+      sender: email.sender,
+      body: email.body || email.preview || "",
+      tone_override: toneMap[tone] || "formal",
+    },
+    validator: (data) => typeof data?.draft === "string",
+  });
 
-    if (typeof data?.draft !== "string") {
-      throw new Error("Draft response did not contain a draft string.");
-    }
-
-    return data?.draft || buildFallbackDraft(email, tone);
-  } catch (error) {
-    return buildFallbackDraft(email, tone);
-  }
+  return {
+    draft: result.data.draft,
+    baseUrl: result.baseUrl,
+  };
 };

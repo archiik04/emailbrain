@@ -104,6 +104,7 @@ export default function AIWorkspace({
   onDraftChange,
   onGenerateDraft,
   isDraftLoading,
+  draftError,
 }) {
   const insights = useMemo(() => buildInsights(email), [email]);
   const [askPrompt, setAskPrompt] = useState("");
@@ -298,6 +299,12 @@ export default function AIWorkspace({
             placeholder="Generate a draft to begin shaping your response."
           />
         </div>
+
+        {draftError ? (
+          <div className="mt-4 rounded-2xl border border-amber-200/10 bg-amber-200/[0.08] px-3 py-2 text-sm text-amber-50/75">
+            {draftError}
+          </div>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap gap-3">
           <button

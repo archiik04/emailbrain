@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Inbox as InboxIcon } from "lucide-react";
 import { fetchInbox, generateDraft } from "../api/inboxApi";
+import { ApiRequestError } from "../api/client";
 import AIWorkspace from "../components/AIWorkspace";
 import EmailCard from "../components/EmailCard";
 import SearchBar from "../components/SearchBar";
@@ -61,36 +62,78 @@ export default function InboxPage() {
   const [draft, setDraft] = useState("");
   const [tone, setTone] = useState("Professional");
   const [draftLoading, setDraftLoading] = useState(false);
-  const [sourceLabel, setSourceLabel] = useState("Connecting");
+  const [sourceLabel, setSourceLabel] = useState("Checking backend");
   const [errorMessage, setErrorMessage] = useState("");
+  const [draftError, setDraftError] = useState("");
+  const [connectionState, setConnectionState] = useState("loading");
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const describeInboxError = (error) => {
+    if (error instanceof ApiRequestError) {
+      if (error.isNetworkError) {
+        return "Backend offline or blocked by CORS. Start FastAPI and make sure port 8765 is reachable from the browser.";
+      }
+
+      if (error.status) {
+        return `Backend returned ${error.status} for ${error.endpoint}.`;
+      }
+    }
+
+    return "Inbox failed to load from the backend.";
+  };
 
   useEffect(() => {
     let active = true;
 
     const loadInbox = async () => {
       setLoading(true);
-      const result = await fetchInbox();
+      setDraftError("");
 
-      if (!active) {
-        return;
+      try {
+        const result = await fetchInbox();
+
+        if (!active) {
+          return;
+        }
+
+        setEmails(result.emails);
+        setSourceLabel(`Connected: ${result.baseUrl.replace("http://", "")}`);
+        setConnectionState(result.emails.length ? "connected" : "empty");
+        setErrorMessage(
+          result.emails.length
+            ? ""
+            : "Connected to the backend, but the inbox returned zero threads."
+        );
+
+        setSelectedId((currentSelectedId) => {
+          const preserved = result.emails.find(
+            (email) => email.message_id === currentSelectedId
+          );
+
+          return preserved?.message_id || result.emails[0]?.message_id || null;
+        });
+
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        console.error("Inbox load failed", error);
+        setEmails([]);
+        setSelectedId(null);
+        setDraft("");
+        setConnectionState(
+          error instanceof ApiRequestError && error.isNetworkError
+            ? "offline"
+            : "error"
+        );
+        setSourceLabel("Backend unavailable");
+        setErrorMessage(describeInboxError(error));
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-
-      setEmails(result.emails);
-      setSourceLabel(result.usingMock ? "Mock fallback" : "Live backend");
-      setErrorMessage(
-        result.usingMock
-          ? "Backend unavailable, so EmailBrain is showing sample data until the API responds."
-          : result.emails.length === 0
-            ? "Connected to the backend, but it did not return any inbox threads yet."
-            : ""
-      );
-
-      if (result.emails.length) {
-        setSelectedId(result.emails[0].message_id);
-        setDraft(defaultDraft(result.emails[0]));
-      }
-
-      setLoading(false);
     };
 
     loadInbox();
@@ -98,7 +141,7 @@ export default function InboxPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const filteredEmails = useMemo(
     () => emails.filter((email) => matchesQuery(email, query)),
@@ -139,6 +182,7 @@ export default function InboxPage() {
   const handleSelectEmail = (email) => {
     setSelectedId(email.message_id);
     setDraft(defaultDraft(email));
+    setDraftError("");
   };
 
   const handleGenerateDraft = async () => {
@@ -147,9 +191,22 @@ export default function InboxPage() {
     }
 
     setDraftLoading(true);
-    const nextDraft = await generateDraft(selectedEmail, tone);
-    setDraft(nextDraft);
-    setDraftLoading(false);
+    setDraftError("");
+
+    try {
+      const result = await generateDraft(selectedEmail, tone);
+      setDraft(result.draft);
+      setSourceLabel(`Connected: ${result.baseUrl.replace("http://", "")}`);
+    } catch (error) {
+      console.error("Draft generation failed", error);
+      setDraftError(
+        error instanceof ApiRequestError
+          ? `Draft generation failed${error.status ? ` (${error.status})` : ""}.`
+          : "Draft generation failed."
+      );
+    } finally {
+      setDraftLoading(false);
+    }
   };
 
   return (
@@ -163,7 +220,10 @@ export default function InboxPage() {
         title="Inbox Command Center"
         subtitle="Triage, summarize, and draft from a calm workspace designed for fast email decisions."
         sourceLabel={sourceLabel}
-        statPills={stats}
+        statPills={[
+          { label: loading ? "Loading inbox" : `Status: ${connectionState}` },
+          ...stats,
+        ]}
       />
 
       <div className="flex-1 overflow-hidden p-4 sm:p-5 lg:p-6">
@@ -178,8 +238,21 @@ export default function InboxPage() {
                 onExampleClick={setQuery}
               />
               {errorMessage ? (
-                <div className="mt-4 rounded-2xl border border-amber-200/10 bg-amber-200/[0.08] px-3 py-2 text-sm text-amber-50/75">
-                  {errorMessage}
+                <div className={`mt-4 flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-sm ${
+                  connectionState === "offline"
+                    ? "border-rose-200/10 bg-rose-200/[0.08] text-rose-50/75"
+                    : connectionState === "error"
+                      ? "border-amber-200/10 bg-amber-200/[0.08] text-amber-50/75"
+                      : "border-white/10 bg-white/[0.04] text-white/70"
+                }`}>
+                  <span>{errorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={() => setReloadKey((value) => value + 1)}
+                    className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-white/75 transition hover:bg-white/[0.05]"
+                  >
+                    Retry
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -242,6 +315,7 @@ export default function InboxPage() {
               onDraftChange={setDraft}
               onGenerateDraft={handleGenerateDraft}
               isDraftLoading={draftLoading}
+              draftError={draftError}
             />
           </div>
         </div>
