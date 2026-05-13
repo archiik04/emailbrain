@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Inbox as InboxIcon } from "lucide-react";
 import { fetchInbox, generateDraft } from "../api/inboxApi";
+import { searchEmails } from "../api/searchApi";
 import { ApiRequestError } from "../api/client";
 import AIWorkspace from "../components/AIWorkspace";
 import EmailCard from "../components/EmailCard";
@@ -35,18 +36,26 @@ Best,
 You`;
 };
 
-const matchesQuery = (email, query) => {
-  const normalized = query.trim().toLowerCase();
-
-  if (!normalized) {
-    return true;
-  }
-
-  return [email.sender, email.subject, email.preview, email.urgency]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(normalized);
+// Normalize a raw search result into the shape EmailCard expects
+const normalizeSearchResult = (r, index) => {
+  const score = typeof r.score === "number" ? r.score : 0;
+  const urgency = score >= 0.7 ? "High" : score >= 0.4 ? "Medium" : "Low";
+  const date = r.date || "";
+  const displayDate = date
+    ? new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : "";
+  return {
+    message_id: r.message_id || `result-${index}`,
+    sender: r.sender || "Unknown sender",
+    subject: r.subject || "(no subject)",
+    preview: r.preview || "",
+    body: r.body || r.preview || "",
+    score: Math.round(score * 10),   // convert 0-1 to 0-10 to match EmailCard
+    urgency,
+    unread: false,
+    date,
+    displayDate,
+  };
 };
 
 const SkeletonCard = () => (
@@ -78,6 +87,11 @@ export default function InboxPage() {
   const [draftError, setDraftError] = useState("");
   const [connectionState, setConnectionState] = useState("loading");
   const [reloadKey, setReloadKey] = useState(0);
+  // ── Search state ──
+  const [searchResults, setSearchResults] = useState(null);  // null = no search active
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchSummary, setSearchSummary] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
   const [splitRatio, setSplitRatio] = useState(() => {
     if (typeof window === "undefined") {
       return DEFAULT_SPLIT_RATIO;
@@ -237,18 +251,51 @@ export default function InboxPage() {
     };
   }, [reloadKey]);
 
-  const filteredEmails = useMemo(
-    () => emails.filter((email) => matchesQuery(email, query)),
-    [emails, query]
-  );
+  // Run API search; called from form submit and chip clicks
+  const handleSearch = useCallback(async (overrideQuery) => {
+    const q = (overrideQuery ?? query).trim();
+    if (!q) return;                        // empty box → do nothing
+    setSearchLoading(true);
+    setSearchResults(null);
+    setSearchSummary("");
+    setActiveQuery(q);
+    try {
+      const data = await searchEmails(q, 15);
+      const normalized = (data.results || []).map(normalizeSearchResult);
+      setSearchResults(normalized);
+      setSearchSummary(data.summary || "");
+      // Select first result so the right panel isn't blank
+      if (normalized.length > 0) {
+        setSelectedId(normalized[0].message_id);
+        setDraft("");
+      }
+    } catch {
+      setSearchResults([]);
+      setSearchSummary("Could not reach the backend. Is the server running on :8765?");
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [query]);
+
+  const handleClearSearch = () => {
+    setQuery("");
+    setSearchResults(null);
+    setSearchSummary("");
+    setActiveQuery("");
+    // Restore selection to first inbox email
+    setSelectedId(emails[0]?.message_id || null);
+  };
+
+  // The list shown in the left panel: search results OR full inbox
+  const displayedEmails = searchResults ?? emails;
 
   const selectedEmail = useMemo(
     () =>
-      filteredEmails.find((email) => email.message_id === selectedId) ||
+      displayedEmails.find((email) => email.message_id === selectedId) ||
       emails.find((email) => email.message_id === selectedId) ||
-      filteredEmails[0] ||
+      displayedEmails[0] ||
       null,
-    [emails, filteredEmails, selectedId]
+    [emails, displayedEmails, selectedId]
   );
 
   useEffect(() => {
@@ -405,9 +452,9 @@ export default function InboxPage() {
               <SearchBar
                 value={query}
                 onChange={setQuery}
-                onSubmit={(event) => event.preventDefault()}
+                onSubmit={(event) => { event.preventDefault(); handleSearch(); }}
                 examples={examplePrompts}
-                onExampleClick={setQuery}
+                onExampleClick={(example) => { setQuery(example); handleSearch(example); }}
               />
 
               {errorMessage ? (
@@ -437,38 +484,77 @@ export default function InboxPage() {
                 <div>
                   <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[#7A6851]">
                     <InboxIcon className="h-4 w-4 text-[#A77B28]" />
-                    Inbox listings
+                    {searchResults ? "Search results" : "Inbox listings"}
                   </div>
                   <p className="mt-2 text-sm text-muted">
-                    Structured browsing for threads that deserve attention.
+                    {searchResults
+                      ? activeQuery
+                      : "Structured browsing for threads that deserve attention."}
                   </p>
                 </div>
-                <div className="rounded-full border border-[#2B2B2B]/8 bg-[#F7F1E7] px-3.5 py-1.5 text-[11px] tracking-wide text-[#7A6851]">
-                  {filteredEmails.length} visible
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full border border-[#2B2B2B]/8 bg-[#F7F1E7] px-3.5 py-1.5 text-[11px] tracking-wide text-[#7A6851]">
+                    {searchResults
+                      ? `${displayedEmails.length} result${displayedEmails.length !== 1 ? "s" : ""}`
+                      : `${emails.length} visible`}
+                  </div>
+                  {searchResults && (
+                    <button
+                      type="button"
+                      onClick={handleClearSearch}
+                      className="rounded-full border border-[#2B2B2B]/8 bg-white/65 px-3 py-1.5 text-[11px] text-[#6F665C] transition hover:bg-white hover:text-ink"
+                    >
+                      × Clear
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="flex-1 space-y-3.5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-                {loading
+                {/* Inbox initial load skeletons */}
+                {loading && !searchResults
                   ? Array.from({ length: 4 }).map((_, index) => (
                       <SkeletonCard key={`skeleton-${index}`} />
                     ))
                   : null}
 
-                {!loading && filteredEmails.length === 0 ? (
+                {/* Search loading state */}
+                {searchLoading && (
+                  <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-muted">
+                    Searching…
+                  </div>
+                )}
+
+                {/* AI summary card (search mode only) */}
+                {!searchLoading && searchSummary && searchResults && (
+                  <div className="rounded-[20px] border border-[#2B2B2B]/8 bg-white/70 px-4 py-3 text-[12px] leading-6 text-[#574D43] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                    <span className="mr-1.5 font-semibold uppercase tracking-[0.14em] text-[#7A6851]">AI:</span>
+                    {searchSummary}
+                  </div>
+                )}
+
+                {/* Empty state — only after a real API search returns 0 */}
+                {!loading && !searchLoading && searchResults !== null && displayedEmails.length === 0 ? (
                   <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[30px] border border-dashed border-[#2B2B2B]/8 bg-white/55 px-8 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-                    <h3 className="font-serif text-[30px] tracking-[-0.04em] text-ink">
-                      No threads match that prompt
+                    <h3 className="font-serif text-[26px] tracking-[-0.04em] text-ink">
+                      No emails found
                     </h3>
                     <p className="mt-4 max-w-sm text-sm leading-7 text-muted">
-                      Try a broader phrasing like "recruiters", "deadlines", or
-                      "follow up".
+                      No results for &ldquo;{activeQuery}&rdquo;. Try different keywords.
                     </p>
+                    <button
+                      type="button"
+                      onClick={handleClearSearch}
+                      className="mt-5 rounded-full border border-[#2B2B2B]/8 bg-white px-4 py-2 text-xs text-[#6F665C] transition hover:bg-[#F4EBDF] hover:text-ink"
+                    >
+                      Back to inbox
+                    </button>
                   </div>
                 ) : null}
 
-                {!loading
-                  ? filteredEmails.map((email) => (
+                {/* Email / result cards */}
+                {!loading && !searchLoading
+                  ? displayedEmails.map((email) => (
                       <EmailCard
                         key={email.message_id}
                         email={email}
