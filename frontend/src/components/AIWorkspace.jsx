@@ -105,6 +105,8 @@ export default function AIWorkspace({
   onGenerateDraft,
   isDraftLoading,
   draftError,
+  isCompact = false,
+  isNarrow = false,
 }) {
   const insights = useMemo(() => buildInsights(email), [email]);
   const [askPrompt, setAskPrompt] = useState("");
@@ -133,35 +135,38 @@ export default function AIWorkspace({
 
   return (
     <motion.section
-      className="flex h-full flex-col gap-4"
+      className="flex h-full flex-col gap-5"
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
     >
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5 shadow-halo">
-        <div className="flex flex-col gap-4 border-b border-white/8 pb-5 xl:flex-row xl:items-start xl:justify-between">
+      <motion.div
+        layout
+        className="rounded-[30px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_22px_60px_rgba(0,0,0,0.28)]"
+      >
+        <div className={`flex flex-col gap-5 border-b border-white/[0.06] pb-6 ${isCompact ? "" : "xl:flex-row xl:items-start xl:justify-between"}`}>
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-accent">
+            <div className="inline-flex items-center rounded-full border border-accent/14 bg-accent/[0.08] px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-accent/85">
               Live AI workspace
             </div>
-            <h2 className="mt-4 text-xl font-semibold tracking-tight text-white">
+            <h2 className={`mt-5 font-semibold tracking-[-0.03em] text-white/96 ${isNarrow ? "text-[20px]" : "text-[24px]"}`}>
               {email.subject}
             </h2>
-            <p className="mt-2 text-sm leading-6 text-white/48">{email.sender}</p>
+            <p className="mt-3 text-sm leading-6 text-white/38">{email.sender}</p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className={`flex flex-wrap ${isNarrow ? "gap-2" : "gap-2.5"}`}>
             <button
               type="button"
               onClick={onGenerateDraft}
-              className="inline-flex items-center gap-2 rounded-2xl border border-accent/25 bg-accent px-4 py-3 text-sm font-medium text-white shadow-glow transition hover:brightness-110"
+              className={`inline-flex items-center gap-2 rounded-[18px] border border-accent/16 bg-accent/[0.14] text-sm font-medium text-white/92 shadow-[0_10px_24px_rgba(33,21,69,0.18)] transition hover:-translate-y-0.5 hover:bg-accent/[0.18] ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
             >
               {isDraftLoading ? "Generating..." : "Generate Draft"}
             </button>
             <button
               type="button"
               onClick={() => setAskAnswer(answerPrompt(askPrompt, email, insights))}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/75 transition hover:border-white/15 hover:text-white"
+              className={`inline-flex items-center gap-2 rounded-[18px] border border-white/[0.07] bg-white/[0.03] text-sm font-medium text-white/62 transition hover:border-white/[0.11] hover:bg-white/[0.045] hover:text-white/86 ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
             >
               <MessageSquareText className="h-4 w-4" />
               Ask AI
@@ -169,7 +174,7 @@ export default function AIWorkspace({
             <button
               type="button"
               onClick={() => setSummaryMode("thread")}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/75 transition hover:border-white/15 hover:text-white"
+              className={`inline-flex items-center gap-2 rounded-[18px] border border-white/[0.07] bg-white/[0.03] text-sm font-medium text-white/62 transition hover:border-white/[0.11] hover:bg-white/[0.045] hover:text-white/86 ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
             >
               <FileText className="h-4 w-4" />
               Summarize Thread
@@ -177,23 +182,25 @@ export default function AIWorkspace({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
-          <div className="space-y-4">
-            <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
-              <div className="mb-3 text-sm font-medium text-white">AI Summary</div>
-              <p className="text-sm leading-7 text-white/58">{activeSummary}</p>
+        <div className={`mt-6 grid gap-5 ${isCompact ? "grid-cols-1" : "xl:grid-cols-[1.12fr,0.88fr]"}`}>
+          <div className="space-y-5">
+            <div className="rounded-[26px] bg-black/18 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+              <div className="mb-3 text-[11px] uppercase tracking-[0.2em] text-white/28">
+                AI Summary
+              </div>
+              <p className={`max-w-3xl text-white/58 ${isNarrow ? "text-[14px] leading-7" : "text-[15px] leading-8"}`}>{activeSummary}</p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
-                <div className="mb-3 text-sm font-medium text-white">
+            <div className={`grid gap-5 ${isCompact ? "grid-cols-1" : "lg:grid-cols-2"}`}>
+              <div className="rounded-[26px] bg-black/18 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+                <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-white/28">
                   Extracted action items
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {insights.actionItems.map((item) => (
                     <div
                       key={item}
-                      className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm leading-6 text-white/55"
+                      className="rounded-[20px] bg-white/[0.035] px-4 py-3.5 text-[13px] leading-6 text-white/52"
                     >
                       {item}
                     </div>
@@ -201,16 +208,16 @@ export default function AIWorkspace({
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
-                  <CalendarRange className="h-4 w-4 text-accent" />
+              <div className="rounded-[26px] bg-black/18 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+                <div className="mb-4 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/28">
+                  <CalendarRange className="h-4 w-4 text-accent/78" />
                   Meeting dates
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {insights.dates.map((item) => (
                     <div
                       key={item}
-                      className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm leading-6 text-white/55"
+                      className="rounded-[20px] bg-white/[0.035] px-4 py-3.5 text-[13px] leading-6 text-white/52"
                     >
                       {item}
                     </div>
@@ -220,19 +227,19 @@ export default function AIWorkspace({
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
-            <div className="mb-3 text-sm font-medium text-white">
+          <div className="rounded-[26px] bg-black/18 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+            <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-white/28">
               Ask this thread anything
             </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+            <div className="rounded-[22px] bg-white/[0.03] p-4">
               <textarea
                 value={askPrompt}
                 onChange={(event) => setAskPrompt(event.target.value)}
                 placeholder={`Try "${insights.suggestedQuestions[0]}"`}
-                className="min-h-[92px] w-full resize-none bg-transparent text-sm leading-6 text-white outline-none placeholder:text-white/24"
+                className={`w-full resize-none bg-transparent text-[14px] text-white/82 outline-none placeholder:text-white/22 ${isNarrow ? "min-h-[100px] leading-[1.65]" : "min-h-[110px] leading-7"}`}
               />
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2.5">
               {insights.suggestedQuestions.map((question) => (
                 <button
                   key={question}
@@ -241,7 +248,7 @@ export default function AIWorkspace({
                     setAskPrompt(question);
                     setAskAnswer(answerPrompt(question, email, insights));
                   }}
-                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/48 transition hover:border-accent/20 hover:text-white/80"
+                  className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3.5 py-1.5 text-[11px] tracking-wide text-white/44 transition hover:-translate-y-0.5 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white/82"
                 >
                   {question}
                 </button>
@@ -251,7 +258,7 @@ export default function AIWorkspace({
             <AnimatePresence mode="wait">
               <motion.div
                 key={askAnswer || "empty-answer"}
-                className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-sm leading-7 text-white/58"
+                className="mt-5 rounded-[22px] bg-white/[0.03] px-4 py-4 text-[14px] leading-7 text-white/56"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -262,27 +269,35 @@ export default function AIWorkspace({
             </AnimatePresence>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5 shadow-halo">
-        <div className="flex flex-col gap-4 border-b border-white/8 pb-5 lg:flex-row lg:items-center lg:justify-between">
+      <motion.div
+        layout
+        className="rounded-[30px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_22px_60px_rgba(0,0,0,0.28)]"
+      >
+        <div className={`flex flex-col gap-5 border-b border-white/[0.06] pb-6 ${isCompact ? "" : "lg:flex-row lg:items-center lg:justify-between"}`}>
           <div>
-            <h3 className="text-lg font-semibold text-white">Suggested reply</h3>
-            <p className="mt-2 text-sm text-white/45">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-white/28">
+              AI Draft
+            </p>
+            <h3 className={`mt-3 font-semibold tracking-[-0.03em] text-white/94 ${isNarrow ? "text-[20px]" : "text-[22px]"}`}>
+              Suggested reply
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-white/38">
               Draft with AI, then refine the final tone yourself.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2.5">
             {toneOptions.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => onToneChange(option)}
-                className={`rounded-full border px-3 py-2 text-xs font-medium transition ${
+                className={`rounded-full border px-3.5 py-2 text-[11px] font-medium uppercase tracking-[0.18em] transition ${
                   tone === option
-                    ? "border-accent/30 bg-accent/[0.14] text-white"
-                    : "border-white/10 bg-white/[0.03] text-white/48 hover:text-white/78"
+                    ? "border-accent/18 bg-accent/[0.12] text-white/90"
+                    : "border-white/[0.06] bg-white/[0.025] text-white/42 hover:border-white/[0.1] hover:bg-white/[0.045] hover:text-white/78"
                 }`}
               >
                 {option}
@@ -291,38 +306,38 @@ export default function AIWorkspace({
           </div>
         </div>
 
-        <div className="mt-5 rounded-[24px] border border-white/8 bg-black/20 p-4">
+        <div className="mt-6 rounded-[26px] bg-black/18 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
           <textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
-            className="min-h-[220px] w-full resize-y bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/24"
+            className="min-h-[240px] w-full resize-y bg-transparent text-[14px] leading-8 text-white/84 outline-none placeholder:text-white/22"
             placeholder="Generate a draft to begin shaping your response."
           />
         </div>
 
         {draftError ? (
-          <div className="mt-4 rounded-2xl border border-amber-200/10 bg-amber-200/[0.08] px-3 py-2 text-sm text-amber-50/75">
+          <div className="mt-4 rounded-[20px] border border-amber-200/10 bg-amber-200/[0.08] px-4 py-3 text-sm text-amber-50/75">
             {draftError}
           </div>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={onGenerateDraft}
-            className="rounded-2xl border border-accent/20 bg-accent px-4 py-3 text-sm font-medium text-white shadow-glow transition hover:brightness-110"
+            className="rounded-[18px] border border-accent/16 bg-accent/[0.14] px-4 py-3 text-sm font-medium text-white/92 shadow-[0_10px_24px_rgba(33,21,69,0.18)] transition hover:-translate-y-0.5 hover:bg-accent/[0.18]"
           >
             {isDraftLoading ? "Generating..." : "Generate"}
           </button>
           <button
             type="button"
             onClick={onGenerateDraft}
-            className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/72 transition hover:border-white/15 hover:text-white"
+            className="rounded-[18px] border border-white/[0.07] bg-white/[0.03] px-4 py-3 text-sm font-medium text-white/64 transition hover:-translate-y-0.5 hover:border-white/[0.11] hover:bg-white/[0.045] hover:text-white/84"
           >
             Regenerate
           </button>
         </div>
-      </div>
+      </motion.div>
     </motion.section>
   );
 }

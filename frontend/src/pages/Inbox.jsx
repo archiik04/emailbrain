@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Inbox as InboxIcon } from "lucide-react";
 import { fetchInbox, generateDraft } from "../api/inboxApi";
@@ -7,6 +7,14 @@ import AIWorkspace from "../components/AIWorkspace";
 import EmailCard from "../components/EmailCard";
 import SearchBar from "../components/SearchBar";
 import Topbar from "../components/Topbar";
+
+const MOBILE_BREAKPOINT = 900;
+const DESKTOP_BREAKPOINT = 1280;
+const DEFAULT_SPLIT_RATIO = 0.46;
+const MIN_LIST_RATIO = 0.45;
+const TABLET_MAX_LIST_RATIO = 0.56;
+const MIN_WORKSPACE_WIDTH = 320;
+const SPLIT_STORAGE_KEY = "emailbrain:workspace-split";
 
 const examplePrompts = [
   "show internship emails",
@@ -55,6 +63,9 @@ const SkeletonCard = () => (
 );
 
 export default function InboxPage() {
+  const splitContainerRef = useRef(null);
+  const frameRef = useRef(null);
+  const pendingRatioRef = useRef(DEFAULT_SPLIT_RATIO);
   const [emails, setEmails] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -67,6 +78,17 @@ export default function InboxPage() {
   const [draftError, setDraftError] = useState("");
   const [connectionState, setConnectionState] = useState("loading");
   const [reloadKey, setReloadKey] = useState(0);
+  const [splitRatio, setSplitRatio] = useState(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_SPLIT_RATIO;
+    }
+
+    const stored = Number(window.localStorage.getItem(SPLIT_STORAGE_KEY));
+    return Number.isFinite(stored) ? stored : DEFAULT_SPLIT_RATIO;
+  });
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isDividerHovered, setIsDividerHovered] = useState(false);
 
   const describeInboxError = (error) => {
     if (error instanceof ApiRequestError) {
@@ -81,6 +103,76 @@ export default function InboxPage() {
 
     return "Inbox failed to load from the backend.";
   };
+
+  useEffect(() => {
+    const element = splitContainerRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(([entry]) => {
+      setContainerWidth(entry.contentRect.width);
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const layoutMode = useMemo(() => {
+    if (!containerWidth) {
+      return "desktop";
+    }
+
+    if (containerWidth < MOBILE_BREAKPOINT) {
+      return "mobile";
+    }
+
+    if (containerWidth < DESKTOP_BREAKPOINT) {
+      return "tablet";
+    }
+
+    return "desktop";
+  }, [containerWidth]);
+
+  const clampSplitRatio = useCallback((nextRatio, width = containerWidth, mode = layoutMode) => {
+    if (!width || mode === "mobile") {
+      return DEFAULT_SPLIT_RATIO;
+    }
+
+    const maxListRatioByWorkspaceWidth = 1 - MIN_WORKSPACE_WIDTH / width;
+    const modeMaxListRatio =
+      mode === "tablet"
+        ? Math.min(TABLET_MAX_LIST_RATIO, maxListRatioByWorkspaceWidth)
+        : maxListRatioByWorkspaceWidth;
+
+    const minRatio = MIN_LIST_RATIO;
+    const maxRatio = Math.max(minRatio, modeMaxListRatio);
+    return Math.min(Math.max(nextRatio, minRatio), maxRatio);
+  }, [containerWidth, layoutMode]);
+
+  useEffect(() => {
+    if (!containerWidth || layoutMode === "mobile") {
+      return;
+    }
+
+    setSplitRatio((currentRatio) => clampSplitRatio(currentRatio));
+  }, [clampSplitRatio, containerWidth, layoutMode]);
+
+  useEffect(() => {
+    if (layoutMode === "mobile" || typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(SPLIT_STORAGE_KEY, splitRatio.toString());
+  }, [layoutMode, splitRatio]);
+
+  useEffect(() => {
+    return () => {
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -209,6 +301,65 @@ export default function InboxPage() {
     }
   };
 
+  const updateSplitRatio = useCallback((clientX) => {
+    const container = splitContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const bounds = container.getBoundingClientRect();
+    const nextRatio = clampSplitRatio((clientX - bounds.left) / bounds.width);
+
+    pendingRatioRef.current = nextRatio;
+
+    if (frameRef.current) {
+      return;
+    }
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      setSplitRatio(pendingRatioRef.current);
+      frameRef.current = null;
+    });
+  }, [clampSplitRatio]);
+
+  const handlePointerMove = useCallback((event) => {
+    updateSplitRatio(event.clientX);
+  }, [updateSplitRatio]);
+
+  const stopResize = useCallback(() => {
+    setIsResizing(false);
+    document.body.style.userSelect = "";
+    document.body.style.cursor = "";
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", stopResize);
+    window.removeEventListener("pointercancel", stopResize);
+  }, [handlePointerMove]);
+
+  const startResize = (event) => {
+    if (layoutMode === "mobile") {
+      return;
+    }
+
+    event.preventDefault();
+    setIsResizing(true);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    updateSplitRatio(event.clientX);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
+  };
+
+  useEffect(() => stopResize, [stopResize]);
+
+  const listWidth = layoutMode === "mobile" ? "100%" : `${splitRatio * 100}%`;
+  const workspaceWidth = layoutMode === "mobile"
+    ? containerWidth
+    : Math.max(containerWidth * (1 - splitRatio), MIN_WORKSPACE_WIDTH);
+  const workspaceIsCompact = workspaceWidth < 520;
+  const workspaceIsNarrow = workspaceWidth < 420;
+
   return (
     <motion.div
       className="flex h-full flex-col overflow-hidden"
@@ -226,10 +377,20 @@ export default function InboxPage() {
         ]}
       />
 
-      <div className="flex-1 overflow-hidden p-4 sm:p-5 lg:p-6">
-        <div className="grid h-full gap-4 xl:grid-cols-[0.88fr,1.12fr]">
-          <div className="flex min-h-0 flex-col rounded-[28px] border border-white/10 bg-white/[0.04] shadow-halo">
-            <div className="border-b border-white/8 p-4 sm:p-5">
+      <div className="flex-1 overflow-hidden p-5 sm:p-6 lg:p-7">
+        <div
+          ref={splitContainerRef}
+          className={`flex h-full ${layoutMode === "mobile" ? "flex-col gap-5 overflow-y-auto pr-1" : "flex-row gap-0 overflow-hidden"}`}
+        >
+          <motion.div
+            layout
+            style={{
+              width: listWidth,
+              transition: isResizing || layoutMode === "mobile" ? "none" : "width 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+            className="flex min-h-0 shrink-0 flex-col rounded-[30px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_22px_60px_rgba(0,0,0,0.28)]"
+          >
+            <div className="border-b border-white/[0.06] px-5 py-5 sm:px-6 sm:py-6">
               <SearchBar
                 value={query}
                 onChange={setQuery}
@@ -258,22 +419,22 @@ export default function InboxPage() {
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between border-b border-white/8 px-4 py-4 sm:px-5">
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4 sm:px-6">
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-white">
-                    <InboxIcon className="h-4 w-4 text-accent" />
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/28">
+                    <InboxIcon className="h-4 w-4 text-accent/78" />
                     Priority queue
                   </div>
-                  <p className="mt-1 text-sm text-white/42">
+                  <p className="mt-2 text-sm text-white/42">
                     Focus on what needs a decision first.
                   </p>
                 </div>
-                <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/42">
+                <div className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3.5 py-1.5 text-[11px] tracking-wide text-white/36">
                   {filteredEmails.length} visible
                 </div>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="flex-1 space-y-3.5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
                 {loading
                   ? Array.from({ length: 4 }).map((_, index) => (
                       <SkeletonCard key={`skeleton-${index}`} />
@@ -281,11 +442,11 @@ export default function InboxPage() {
                   : null}
 
                 {!loading && filteredEmails.length === 0 ? (
-                  <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] px-8 text-center">
-                    <h3 className="mt-5 text-lg font-semibold text-white">
+                  <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/[0.06] bg-white/[0.02] px-8 text-center">
+                    <h3 className="text-[22px] font-semibold tracking-[-0.03em] text-white/94">
                       No threads match that prompt
                     </h3>
-                    <p className="mt-2 max-w-sm text-sm leading-6 text-white/42">
+                    <p className="mt-4 max-w-sm text-sm leading-7 text-white/38">
                       Try a broader phrasing like "recruiters", "deadlines", or
                       "follow up".
                     </p>
@@ -304,9 +465,61 @@ export default function InboxPage() {
                   : null}
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="min-h-0 overflow-y-auto">
+          {layoutMode !== "mobile" ? (
+            <motion.div
+              className="group relative flex w-5 shrink-0 cursor-col-resize items-center justify-center"
+              onHoverStart={() => setIsDividerHovered(true)}
+              onHoverEnd={() => setIsDividerHovered(false)}
+              onPointerDown={startResize}
+              animate={{
+                opacity: isResizing ? 1 : isDividerHovered ? 0.9 : 0.55,
+              }}
+              transition={{ duration: isResizing ? 0.08 : 0.16 }}
+            >
+              <motion.div
+                className={`absolute inset-y-8 left-1/2 w-px -translate-x-1/2 rounded-full bg-white/0 ${
+                  isResizing ? "shadow-[0_0_14px_rgba(124,92,255,0.45)]" : ""
+                }`}
+                animate={{
+                  backgroundColor: isResizing
+                    ? "rgba(124, 92, 255, 0.88)"
+                    : isDividerHovered
+                      ? "rgba(255,255,255,0.18)"
+                      : "rgba(255,255,255,0.08)",
+                  boxShadow: isResizing
+                    ? "0 0 0 1px rgba(124,92,255,0.14), 0 0 22px rgba(124,92,255,0.35)"
+                    : isDividerHovered
+                      ? "0 0 0 1px rgba(255,255,255,0.03), 0 0 14px rgba(255,255,255,0.06)"
+                      : "0 0 0 1px rgba(255,255,255,0.02)",
+                }}
+                transition={{ duration: isResizing ? 0.05 : 0.18 }}
+              />
+              <motion.div
+                className="relative z-10 flex h-14 w-3 items-center justify-center"
+                animate={{
+                  opacity: isResizing ? 1 : isDividerHovered ? 0.75 : 0.34,
+                  scale: isResizing ? 1.04 : isDividerHovered ? 1.02 : 1,
+                }}
+                transition={{ duration: isResizing ? 0.08 : 0.16 }}
+              >
+                <div className="flex flex-col gap-1">
+                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-white/35"}`} />
+                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-white/35"}`} />
+                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-white/35"}`} />
+                </div>
+              </motion.div>
+            </motion.div>
+          ) : null}
+
+          <motion.div
+            layout
+            className={`min-h-0 min-w-0 flex-1 ${layoutMode === "mobile" ? "" : "overflow-y-auto pr-1"}`}
+            style={{
+              transition: isResizing || layoutMode === "mobile" ? "none" : "all 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
             <AIWorkspace
               email={selectedEmail}
               draft={draft}
@@ -316,8 +529,10 @@ export default function InboxPage() {
               onGenerateDraft={handleGenerateDraft}
               isDraftLoading={draftLoading}
               draftError={draftError}
+              isCompact={workspaceIsCompact}
+              isNarrow={workspaceIsNarrow}
             />
-          </div>
+          </motion.div>
         </div>
       </div>
     </motion.div>
