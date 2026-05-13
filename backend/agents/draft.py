@@ -1,6 +1,7 @@
 import ollama
 import json
 import os
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import sys
@@ -95,32 +96,66 @@ def load_tone_profile() -> dict:
             return json.load(f)
     return build_tone_profile()
 
+def extract_first_name(sender: str) -> str:
+    """
+    Handles formats like:
+      "Nathalie Combes <nathalie@canvas8.com>"  → "Nathalie"
+      "nathalie.combes@canvas8.com"             → "Nathalie"
+      "no-reply@accounts.google.com"            → "" (skip greeting)
+      "LinkedIn <messages@linkedin.com>"        → "LinkedIn" (use as-is)
+    """
+    # Try "Display Name <email>" format first
+    name_match = re.match(r'^([^<@]+?)\s*<', sender.strip())
+    if name_match:
+        full_name = name_match.group(1).strip()
+        first_name = full_name.split()[0] if full_name else ""
+        return first_name.capitalize()
+    
+    # Try extracting from email local part: "nathalie.combes@..."
+    email_match = re.match(r'^([a-zA-Z]+)[.\-_]?', sender.strip())
+    if email_match:
+        name = email_match.group(1)
+        # Skip obvious non-names
+        if name.lower() in ("no", "noreply", "hello", "info", 
+                             "support", "team", "mail", "contact"):
+            return ""
+        return name.capitalize()
+    
+    return ""
+
 def draft_reply(subject: str, sender: str, body: str, tone_override: str = None) -> str:
     """
     Generate a reply that sounds like you.
     tone_override: 'casual', 'neutral', or 'formal' — overrides your profile.
     """
+    sender_name = extract_first_name(sender)
     profile = load_tone_profile()
 
-    formality = tone_override or profile.get("formality", "neutral")
+    prompt = f"""You are drafting an email reply on behalf of the user.
 
-    prompt = f"""You are ghostwriting an email reply on behalf of the user.
+Sender's name: {sender_name if sender_name else "there"}
+Email subject: {subject}
+Original email body:
+{body[:800]}
 
-Their writing style:
-- Formality: {formality}
-- Typical length: {profile.get('avg_length', 'medium')}
-- How they open: {profile.get('opener_style', 'friendly')}
-- How they close: {profile.get('closer_style', 'thanks')}
-- Their tone: {profile.get('tone', 'professional')}
-- Phrases they use: {', '.join(profile.get('common_phrases', []))}
+User's writing style:
+- Average email length: {profile.get('avg_length', 'medium')} words
+- Tone: {tone_override or profile.get('tone', 'professional')}
+- Typical opener: {profile.get('opener_style', 'friendly')}
+- Typical closer: {profile.get('closer_style', 'thanks')}
 
-Email to reply to:
-From: {sender}
-Subject: {subject}
-Body: {body[:600]}
+Instructions:
+- Open with "Hi {sender_name if sender_name else 'there'}," (use their actual name)
+- If sender_name is empty or "there", start with "Hi," or "Hello,"
+- Never use the user's own name as the greeting
+- Match the user's writing style described above
+- Reply directly to the content of the email
+- End with an appropriate sign-off from the user's style
+- Do NOT add [Your Name] or placeholders — leave sign-off as just the closing word (e.g. "Best,")
+- Keep length consistent with user's avg_length
+- Tone override (if set): {tone_override or "match user style"}
 
-Write ONLY the reply email body. No subject line. No "Here is a draft:" preamble.
-Sound exactly like the user based on their style above."""
+Write only the email body. No subject line. No metadata."""
 
     response = ollama.chat(
         model="mistral",
