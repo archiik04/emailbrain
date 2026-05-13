@@ -64,18 +64,17 @@ def serialize_email(email: Email) -> dict:
 
 def fetch_scored_inbox(limit: int = 30):
     """
-    Return already-scored inbox emails quickly so the UI can load fast.
+    Return all inbox emails ordered by date (latest first).
+    Unscored emails (score=0) are included so the UI is never empty.
     """
     with Session(engine) as session:
         emails = session.execute(
             select(Email)
             .where(Email.is_sent == False)
-            .where(Email.triage_score > 0)
-            .order_by(Email.triage_score.desc(), Email.date.desc())
+            .order_by(Email.date.desc())   # latest first regardless of score
             .limit(limit)
         ).scalars().all()
-
-    return [serialize_email(email) for email in emails]
+        return [serialize_email(email) for email in emails]  # inside session
 
 
 def run_triage(limit: int = 50):

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarRange, FileText, MessageSquareText } from "lucide-react";
+import { CalendarRange, FileText, Loader2, MessageSquareText } from "lucide-react";
+import { searchEmails } from "../api/searchApi";
 
 const toneOptions = ["Professional", "Friendly", "Casual"];
 
@@ -70,27 +71,6 @@ const buildInsights = (email) => {
   };
 };
 
-const answerPrompt = (prompt, email, insights) => {
-  const normalized = prompt.trim().toLowerCase();
-
-  if (!normalized) {
-    return "Ask about deadlines, reply strategy, or next steps and EmailBrain will shape the answer around this thread.";
-  }
-
-  if (normalized.includes("deadline") || normalized.includes("when")) {
-    return `The clearest time signal is ${insights.dates[0]}. If timing matters, reply today and confirm the next milestone explicitly.`;
-  }
-
-  if (normalized.includes("reply") || normalized.includes("respond")) {
-    return `Lead with a short acknowledgement to ${email.sender.split("<")[0].trim()}, confirm the next step, and keep the reply concise enough to maintain momentum.`;
-  }
-
-  if (normalized.includes("task") || normalized.includes("todo")) {
-    return insights.actionItems.join(" ");
-  }
-
-  return `This thread appears to center on "${email.subject}". I would summarize the response path as: acknowledge it, confirm timing, and close with a concrete next action.`;
-};
 
 const Surface = ({ title, icon, children, className = "" }) => (
   <div className={`rounded-[28px] border border-[#2B2B2B]/7 bg-[#FCFAF6] px-5 py-5 shadow-[0_10px_24px_rgba(115,95,71,0.05),inset_0_1px_0_rgba(255,255,255,0.82)] ${className}`}>
@@ -117,13 +97,48 @@ export default function AIWorkspace({
   const insights = useMemo(() => buildInsights(email), [email]);
   const [askPrompt, setAskPrompt] = useState("");
   const [askAnswer, setAskAnswer] = useState("");
+  const [askLoading, setAskLoading] = useState(false);
   const [summaryMode, setSummaryMode] = useState("default");
+  const [aiSummary, setAiSummary] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   useEffect(() => {
     setAskPrompt("");
     setAskAnswer("");
     setSummaryMode("default");
+    setAiSummary("");
   }, [email?.message_id]);
+
+  const handleAskAI = async (overrideQ) => {
+    const q = (overrideQ ?? askPrompt).trim();
+    if (!q || !email) return;
+    // Include email context so the search is relevant to this thread
+    const contextualQuery = `${q} about: ${email.subject}`;
+    setAskLoading(true);
+    try {
+      const result = await searchEmails(contextualQuery, 3);
+      setAskAnswer(result.summary || result.results?.[0]?.preview || "No results found.");
+    } catch {
+      setAskAnswer("Backend not responding. Make sure the server is running on :8765");
+    } finally {
+      setAskLoading(false);
+    }
+  };
+
+  const handleSummarizeThread = async () => {
+    if (!email) return;
+    setSummaryLoading(true);
+    try {
+      const result = await searchEmails(`summarize: ${email.subject}`, 1);
+      setAiSummary(result.summary || "No summary available.");
+      setSummaryMode("thread");
+    } catch {
+      setAiSummary("Could not reach the backend. Is the server running on :8765?");
+      setSummaryMode("thread");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   if (!email || !insights) {
     return (
@@ -136,9 +151,11 @@ export default function AIWorkspace({
   }
 
   const activeSummary =
-    summaryMode === "thread"
-      ? `${insights.summary} Thread mode adds a fuller pass: start with a confirmation, mention the requested context, and end by naming the next checkpoint.`
-      : insights.summary;
+    summaryMode === "thread" && aiSummary
+      ? aiSummary
+      : summaryMode === "thread"
+        ? `${insights.summary} Thread mode adds a fuller pass: start with a confirmation, mention the requested context, and end by naming the next checkpoint.`
+        : insights.summary;
 
   return (
     <motion.section
@@ -172,18 +189,20 @@ export default function AIWorkspace({
             </button>
             <button
               type="button"
-              onClick={() => setAskAnswer(answerPrompt(askPrompt, email, insights))}
-              className={`inline-flex items-center gap-2 rounded-[18px] border border-[#2B2B2B]/8 bg-white/65 text-sm font-medium text-[#6F665C] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white hover:text-ink ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
+              onClick={handleAskAI}
+              disabled={askLoading || !askPrompt.trim()}
+              className={`inline-flex items-center gap-2 rounded-[18px] border border-[#2B2B2B]/8 bg-white/65 text-sm font-medium text-[#6F665C] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white hover:text-ink disabled:opacity-50 ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
             >
-              <MessageSquareText className="h-4 w-4 text-[#7A6851]" />
+              {askLoading ? <Loader2 className="h-4 w-4 animate-spin text-accent" /> : <MessageSquareText className="h-4 w-4 text-[#7A6851]" />}
               Ask AI
             </button>
             <button
               type="button"
-              onClick={() => setSummaryMode("thread")}
-              className={`inline-flex items-center gap-2 rounded-[18px] border border-[#2B2B2B]/8 bg-white/65 text-sm font-medium text-[#6F665C] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white hover:text-ink ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
+              onClick={handleSummarizeThread}
+              disabled={summaryLoading}
+              className={`inline-flex items-center gap-2 rounded-[18px] border border-[#2B2B2B]/8 bg-white/65 text-sm font-medium text-[#6F665C] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white hover:text-ink disabled:opacity-50 ${isNarrow ? "px-3.5 py-2.5" : "px-4 py-2.5"}`}
             >
-              <FileText className="h-4 w-4 text-[#7A6851]" />
+              {summaryLoading ? <Loader2 className="h-4 w-4 animate-spin text-accent" /> : <FileText className="h-4 w-4 text-[#7A6851]" />}
               Summarize Thread
             </button>
           </div>
@@ -234,6 +253,7 @@ export default function AIWorkspace({
               <textarea
                 value={askPrompt}
                 onChange={(event) => setAskPrompt(event.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAskAI(); } }}
                 placeholder={`Try "${insights.suggestedQuestions[0]}"`}
                 className={`w-full resize-none bg-transparent text-[14px] text-ink outline-none placeholder:text-[#8A7D6A] ${isNarrow ? "min-h-[100px] leading-[1.65]" : "min-h-[110px] leading-7"}`}
               />
@@ -246,7 +266,7 @@ export default function AIWorkspace({
                   type="button"
                   onClick={() => {
                     setAskPrompt(question);
-                    setAskAnswer(answerPrompt(question, email, insights));
+                    handleAskAI(question);
                   }}
                   className="rounded-full border border-[#2B2B2B]/7 bg-white px-3.5 py-1.5 text-[11px] tracking-wide text-[#6F665C] transition hover:-translate-y-0.5 hover:bg-[#F4EBDF] hover:text-ink"
                 >
@@ -257,14 +277,15 @@ export default function AIWorkspace({
 
             <AnimatePresence mode="wait">
               <motion.div
-                key={askAnswer || "empty-answer"}
+                key={askLoading ? "loading" : (askAnswer || "empty-answer")}
                 className="mt-5 rounded-[22px] border border-[#2B2B2B]/6 bg-[#F6F0E7] px-4 py-4 text-[14px] leading-7 text-[#5C5248]"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
               >
-                {askAnswer ||
-                  "EmailBrain keeps this contextual. Ask for deadlines, suggested replies, or a tighter summary."}
+                {askLoading
+                  ? <span className="italic text-[#9A8E7F]">Thinking…</span>
+                  : (askAnswer || "EmailBrain keeps this contextual. Ask for deadlines, suggested replies, or a tighter summary.")}
               </motion.div>
             </AnimatePresence>
           </Surface>
