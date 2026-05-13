@@ -9,34 +9,33 @@ export default function SearchBar({
   onExampleClick,
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-white/26">
-            Intelligence layer
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[#7A6851]/80">
+            Search workspace
           </p>
-          <p className="mt-2 text-sm text-white/44">
-            Ask your inbox in natural language.
+          <p className="mt-2 text-sm text-muted">
+            Search your inbox like a structured opportunity board.
           </p>
         </div>
       </div>
       <motion.form
-        className="group flex items-center gap-3 rounded-[24px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.03))] px-5 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_40px_rgba(0,0,0,0.24)] transition-all duration-200 focus-within:border-accent/22 focus-within:bg-white/[0.06] focus-within:shadow-[0_0_0_1px_rgba(124,92,255,0.12),0_22px_50px_rgba(25,18,47,0.24)]"
+        className="group mx-auto flex max-w-3xl items-center gap-3 rounded-[28px] border border-[#2B2B2B]/10 bg-white/76 px-6 py-5 shadow-[0_18px_38px_rgba(120,95,67,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-200 focus-within:-translate-y-0.5 focus-within:border-[#D8B08A] focus-within:bg-white"
         onSubmit={onSubmit}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.05 }}
-        whileFocus={{ scale: 1.002 }}
       >
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="Ask your inbox anything..."
-          className="h-12 flex-1 bg-transparent text-[15px] font-medium tracking-tight text-white outline-none placeholder:font-normal placeholder:text-white/24"
+          className="h-12 flex-1 bg-transparent text-[16px] font-medium tracking-tight text-ink outline-none placeholder:font-normal placeholder:text-[#8A7D6A]"
         />
         <button
           type="submit"
-          className="inline-flex h-11 items-center gap-2 rounded-[18px] border border-white/[0.08] bg-white/[0.04] px-4 text-sm font-medium text-white/68 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:-translate-y-0.5 hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-white"
+          className="inline-flex h-12 items-center gap-2 rounded-[20px] border border-[#D45F4D]/20 bg-accent px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(221,107,87,0.18)] transition hover:-translate-y-0.5 hover:scale-[1.01] hover:bg-[#D45F4D]"
         >
           Explore
           <ArrowRight className="h-4 w-4" />
@@ -49,7 +48,7 @@ export default function SearchBar({
             key={example}
             type="button"
             onClick={() => onExampleClick(example)}
-            className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3.5 py-1.5 text-[11px] tracking-wide text-white/42 transition hover:-translate-y-0.5 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white/78"
+            className="rounded-full border border-[#2B2B2B]/8 bg-[#F7F1E7] px-3.5 py-1.5 text-[11px] tracking-wide text-[#6F665C] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition hover:-translate-y-0.5 hover:bg-white hover:text-ink"
           >
             {example}
           </button>

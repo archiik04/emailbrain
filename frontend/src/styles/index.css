@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,14 +6,16 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --bg: #0a0a0a;
-    --panel: #111111;
-    --border-soft: rgba(255, 255, 255, 0.08);
-    --accent: #7c5cff;
-    --text-main: #ffffff;
-    --text-muted: rgba(255, 255, 255, 0.66);
-    --text-dim: rgba(255, 255, 255, 0.38);
+    color-scheme: light;
+    --bg: #f5f1e8;
+    --panel: #faf7f2;
+    --panel-soft: #efe8db;
+    --border-soft: rgba(43, 43, 43, 0.08);
+    --accent: #dd6b57;
+    --accent-soft: rgba(221, 107, 87, 0.12);
+    --text-main: #2b2b2b;
+    --text-muted: rgba(43, 43, 43, 0.68);
+    --text-dim: rgba(43, 43, 43, 0.42);
   }
 
   * {
@@ -33,12 +35,12 @@
   body {
     margin: 0;
     background:
-      radial-gradient(circle at top left, rgba(124, 92, 255, 0.16), transparent 22%),
-      radial-gradient(circle at top right, rgba(83, 139, 255, 0.1), transparent 22%),
-      radial-gradient(circle at center top, rgba(255, 255, 255, 0.03), transparent 28%),
+      radial-gradient(circle at top left, rgba(234, 214, 191, 0.7), transparent 22%),
+      radial-gradient(circle at top right, rgba(255, 255, 255, 0.72), transparent 24%),
+      linear-gradient(180deg, rgba(255, 251, 245, 0.92), rgba(245, 241, 232, 1)),
       var(--bg);
     color: var(--text-main);
-    font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    font-family: "Manrope", "Segoe UI", sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -52,9 +54,9 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.04), transparent 22%),
-      radial-gradient(circle at 80% 100%, rgba(255, 255, 255, 0.025), transparent 24%);
-    opacity: 0.75;
+      radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.55), transparent 24%),
+      radial-gradient(circle at 80% 100%, rgba(225, 209, 187, 0.34), transparent 24%);
+    opacity: 0.9;
   }
 
   body::after {
@@ -63,9 +65,9 @@
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.28)),
-      radial-gradient(circle at center, transparent 55%, rgba(0, 0, 0, 0.3) 100%);
-    opacity: 0.95;
+      radial-gradient(circle at center, transparent 62%, rgba(147, 126, 97, 0.06) 100%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(213, 196, 170, 0.05));
+    opacity: 1;
   }
 
   button,
@@ -76,7 +78,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    scrollbar-color: rgba(122, 104, 81, 0.22) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -90,15 +92,15 @@
 
   *::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(122, 104, 81, 0.18);
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(122, 104, 81, 0.26);
   }
 
   ::selection {
-    background: rgba(124, 92, 255, 0.34);
-    color: white;
+    background: rgba(221, 107, 87, 0.18);
+    color: #2b2b2b;
   }
 }

@@ -1,12 +1,24 @@
 import { motion } from "framer-motion";
 
 const urgencyStyles = {
-  High: "border-rose-400/18 bg-rose-400/10 text-rose-200",
-  Medium: "border-amber-300/18 bg-amber-300/10 text-amber-100",
-  Low: "border-emerald-300/18 bg-emerald-300/10 text-emerald-100",
+  High: "border-[#E2B0A6] bg-[#F8E2DD] text-[#A24F42]",
+  Medium: "border-[#E7D4A3] bg-[#F9F0CC] text-[#A77B28]",
+  Low: "border-[#B8CEB2] bg-[#E6F1E2] text-[#5F7B57]",
+};
+
+const getIdentity = (sender = "") => {
+  const plain = sender.replace(/<.*?>/g, "").trim();
+  const parts = plain.split(/\s+/).filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("");
+  return {
+    label: plain || "Unknown",
+    initials: initials || (plain[0]?.toUpperCase() ?? "E"),
+  };
 };
 
 export default function EmailCard({ email, isActive, onClick }) {
+  const identity = getIdentity(email.sender);
+
   return (
     <motion.button
       type="button"
@@ -17,30 +29,37 @@ export default function EmailCard({ email, isActive, onClick }) {
       transition={{ type: "spring", stiffness: 300, damping: 24 }}
       className={`w-full rounded-[24px] border px-4 py-4.5 text-left transition-all duration-200 ${
         isActive
-          ? "border-accent/18 bg-[linear-gradient(180deg,rgba(124,92,255,0.12),rgba(124,92,255,0.06))] shadow-[0_0_0_1px_rgba(124,92,255,0.08),0_18px_38px_rgba(23,17,44,0.24)]"
-          : "border-white/[0.06] bg-white/[0.025] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] hover:border-white/[0.1] hover:bg-white/[0.04] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_18px_36px_rgba(0,0,0,0.22)]"
+          ? "border-[#D9B6AA] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(247,238,228,0.98))] shadow-[0_14px_28px_rgba(130,99,71,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]"
+          : "border-[#2B2B2B]/8 bg-white/70 shadow-[0_10px_18px_rgba(120,95,67,0.06),inset_0_1px_0_rgba(255,255,255,0.84)] hover:border-[#2B2B2B]/12 hover:bg-white hover:shadow-[0_16px_28px_rgba(120,95,67,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            {email.unread ? (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-accent/90 shadow-[0_0_10px_rgba(124,92,255,0.45)]" />
-            ) : null}
-            <p className="truncate text-[13px] font-medium tracking-tight text-white/72">
-              {email.sender}
-            </p>
+        <div className="flex min-w-0 gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-[#2B2B2B]/8 bg-[#F3EBE0] text-sm font-semibold tracking-[0.08em] text-[#5C5348] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+            {identity.initials}
           </div>
-          <h3 className="mt-2.5 truncate text-[15px] font-medium tracking-tight text-white/94">
-            {email.subject}
-          </h3>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {email.unread ? (
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#D96B57]" />
+              ) : null}
+              <p className="truncate text-[13px] font-semibold tracking-tight text-[#6A6157]">
+                {identity.label}
+              </p>
+            </div>
+            <h3 className="mt-2.5 truncate text-[16px] font-semibold tracking-[-0.02em] text-ink">
+              {email.subject}
+            </h3>
+          </div>
         </div>
 
-        <span className="shrink-0 text-[11px] tracking-wide text-white/28">{email.displayDate}</span>
+        <span className="shrink-0 rounded-full bg-[#F3EBE0] px-2.5 py-1 text-[11px] tracking-wide text-[#8A7D6A]">
+          {email.displayDate}
+        </span>
       </div>
 
       <p
-        className="mt-3.5 text-[13px] leading-6 text-white/38"
+        className="mt-4 text-[13px] leading-6 text-muted"
         style={{
           display: "-webkit-box",
           WebkitLineClamp: 2,
@@ -51,16 +70,21 @@ export default function EmailCard({ email, isActive, onClick }) {
         {email.preview}
       </p>
 
-      <div className="mt-4.5 flex items-center justify-between gap-3">
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] ${
-            urgencyStyles[email.urgency]
-          }`}
-        >
-          {email.urgency}
-        </span>
-        <span className="text-[11px] tracking-wide text-white/28">
-          {email.score}/10 priority
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+              urgencyStyles[email.urgency]
+            }`}
+          >
+            {email.urgency}
+          </span>
+          <span className="rounded-full border border-[#2B2B2B]/8 bg-[#F7F1E7] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#7A6851]">
+            {email.unread ? "Unread" : "Reviewed"}
+          </span>
+        </div>
+        <span className="text-[11px] tracking-wide text-[#8A7D6A]">
+          Priority score {email.score}/10
         </span>
       </div>
     </motion.button>

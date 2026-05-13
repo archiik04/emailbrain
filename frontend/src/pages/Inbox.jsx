@@ -50,14 +50,14 @@ const matchesQuery = (email, query) => {
 };
 
 const SkeletonCard = () => (
-  <div className="animate-pulse rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-    <div className="h-4 w-1/3 rounded-full bg-white/10" />
-    <div className="mt-3 h-5 w-4/5 rounded-full bg-white/10" />
-    <div className="mt-3 h-4 w-full rounded-full bg-white/5" />
-    <div className="mt-2 h-4 w-3/4 rounded-full bg-white/5" />
+  <div className="animate-pulse rounded-[24px] border border-[#2B2B2B]/8 bg-white/75 p-4 shadow-[0_10px_18px_rgba(120,95,67,0.05)]">
+    <div className="h-4 w-1/3 rounded-full bg-[#E6DED1]" />
+    <div className="mt-3 h-5 w-4/5 rounded-full bg-[#E6DED1]" />
+    <div className="mt-3 h-4 w-full rounded-full bg-[#EFE8DB]" />
+    <div className="mt-2 h-4 w-3/4 rounded-full bg-[#EFE8DB]" />
     <div className="mt-4 flex justify-between">
-      <div className="h-7 w-16 rounded-full bg-white/10" />
-      <div className="h-4 w-12 rounded-full bg-white/5" />
+      <div className="h-7 w-16 rounded-full bg-[#E6DED1]" />
+      <div className="h-4 w-12 rounded-full bg-[#EFE8DB]" />
     </div>
   </div>
 );
@@ -134,21 +134,24 @@ export default function InboxPage() {
     return "desktop";
   }, [containerWidth]);
 
-  const clampSplitRatio = useCallback((nextRatio, width = containerWidth, mode = layoutMode) => {
-    if (!width || mode === "mobile") {
-      return DEFAULT_SPLIT_RATIO;
-    }
+  const clampSplitRatio = useCallback(
+    (nextRatio, width = containerWidth, mode = layoutMode) => {
+      if (!width || mode === "mobile") {
+        return DEFAULT_SPLIT_RATIO;
+      }
 
-    const maxListRatioByWorkspaceWidth = 1 - MIN_WORKSPACE_WIDTH / width;
-    const modeMaxListRatio =
-      mode === "tablet"
-        ? Math.min(TABLET_MAX_LIST_RATIO, maxListRatioByWorkspaceWidth)
-        : maxListRatioByWorkspaceWidth;
+      const maxListRatioByWorkspaceWidth = 1 - MIN_WORKSPACE_WIDTH / width;
+      const modeMaxListRatio =
+        mode === "tablet"
+          ? Math.min(TABLET_MAX_LIST_RATIO, maxListRatioByWorkspaceWidth)
+          : maxListRatioByWorkspaceWidth;
 
-    const minRatio = MIN_LIST_RATIO;
-    const maxRatio = Math.max(minRatio, modeMaxListRatio);
-    return Math.min(Math.max(nextRatio, minRatio), maxRatio);
-  }, [containerWidth, layoutMode]);
+      const minRatio = MIN_LIST_RATIO;
+      const maxRatio = Math.max(minRatio, modeMaxListRatio);
+      return Math.min(Math.max(nextRatio, minRatio), maxRatio);
+    },
+    [containerWidth, layoutMode]
+  );
 
   useEffect(() => {
     if (!containerWidth || layoutMode === "mobile") {
@@ -204,7 +207,6 @@ export default function InboxPage() {
 
           return preserved?.message_id || result.emails[0]?.message_id || null;
         });
-
       } catch (error) {
         if (!active) {
           return;
@@ -301,30 +303,36 @@ export default function InboxPage() {
     }
   };
 
-  const updateSplitRatio = useCallback((clientX) => {
-    const container = splitContainerRef.current;
-    if (!container) {
-      return;
-    }
+  const updateSplitRatio = useCallback(
+    (clientX) => {
+      const container = splitContainerRef.current;
+      if (!container) {
+        return;
+      }
 
-    const bounds = container.getBoundingClientRect();
-    const nextRatio = clampSplitRatio((clientX - bounds.left) / bounds.width);
+      const bounds = container.getBoundingClientRect();
+      const nextRatio = clampSplitRatio((clientX - bounds.left) / bounds.width);
 
-    pendingRatioRef.current = nextRatio;
+      pendingRatioRef.current = nextRatio;
 
-    if (frameRef.current) {
-      return;
-    }
+      if (frameRef.current) {
+        return;
+      }
 
-    frameRef.current = window.requestAnimationFrame(() => {
-      setSplitRatio(pendingRatioRef.current);
-      frameRef.current = null;
-    });
-  }, [clampSplitRatio]);
+      frameRef.current = window.requestAnimationFrame(() => {
+        setSplitRatio(pendingRatioRef.current);
+        frameRef.current = null;
+      });
+    },
+    [clampSplitRatio]
+  );
 
-  const handlePointerMove = useCallback((event) => {
-    updateSplitRatio(event.clientX);
-  }, [updateSplitRatio]);
+  const handlePointerMove = useCallback(
+    (event) => {
+      updateSplitRatio(event.clientX);
+    },
+    [updateSplitRatio]
+  );
 
   const stopResize = useCallback(() => {
     setIsResizing(false);
@@ -362,7 +370,7 @@ export default function InboxPage() {
 
   return (
     <motion.div
-      className="flex h-full flex-col overflow-hidden"
+      className="flex h-full flex-col overflow-hidden text-ink"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.35 }}
@@ -386,11 +394,14 @@ export default function InboxPage() {
             layout
             style={{
               width: listWidth,
-              transition: isResizing || layoutMode === "mobile" ? "none" : "width 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+              transition:
+                isResizing || layoutMode === "mobile"
+                  ? "none"
+                  : "width 220ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
-            className="flex min-h-0 shrink-0 flex-col rounded-[30px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_22px_60px_rgba(0,0,0,0.28)]"
+            className="flex min-h-0 shrink-0 flex-col rounded-[34px] border border-[#2B2B2B]/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(246,240,230,0.9))] shadow-[0_22px_46px_rgba(111,88,60,0.09),inset_0_1px_0_rgba(255,255,255,0.85)]"
           >
-            <div className="border-b border-white/[0.06] px-5 py-5 sm:px-6 sm:py-6">
+            <div className="border-b border-[#2B2B2B]/8 px-5 py-5 sm:px-6 sm:py-6">
               <SearchBar
                 value={query}
                 onChange={setQuery}
@@ -398,19 +409,22 @@ export default function InboxPage() {
                 examples={examplePrompts}
                 onExampleClick={setQuery}
               />
+
               {errorMessage ? (
-                <div className={`mt-4 flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-sm ${
-                  connectionState === "offline"
-                    ? "border-rose-200/10 bg-rose-200/[0.08] text-rose-50/75"
-                    : connectionState === "error"
-                      ? "border-amber-200/10 bg-amber-200/[0.08] text-amber-50/75"
-                      : "border-white/10 bg-white/[0.04] text-white/70"
-                }`}>
+                <div
+                  className={`mt-5 flex items-center justify-between gap-3 rounded-[22px] border px-4 py-3 text-sm ${
+                    connectionState === "offline"
+                      ? "border-[#E2B0A6] bg-[#F8E2DD] text-[#A24F42]"
+                      : connectionState === "error"
+                        ? "border-[#E7D4A3] bg-[#F9F0CC] text-[#8A6A22]"
+                        : "border-[#2B2B2B]/8 bg-white/55 text-[#6F665C]"
+                  }`}
+                >
                   <span>{errorMessage}</span>
                   <button
                     type="button"
                     onClick={() => setReloadKey((value) => value + 1)}
-                    className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-white/75 transition hover:bg-white/[0.05]"
+                    className="shrink-0 rounded-full border border-[#2B2B2B]/8 bg-white/65 px-3 py-1 text-xs text-[#6F665C] transition hover:bg-white hover:text-ink"
                   >
                     Retry
                   </button>
@@ -419,17 +433,17 @@ export default function InboxPage() {
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4 sm:px-6">
+              <div className="flex items-center justify-between border-b border-[#2B2B2B]/8 px-5 py-4 sm:px-6">
                 <div>
-                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/28">
-                    <InboxIcon className="h-4 w-4 text-accent/78" />
-                    Priority queue
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[#7A6851]">
+                    <InboxIcon className="h-4 w-4 text-[#A77B28]" />
+                    Inbox listings
                   </div>
-                  <p className="mt-2 text-sm text-white/42">
-                    Focus on what needs a decision first.
+                  <p className="mt-2 text-sm text-muted">
+                    Structured browsing for threads that deserve attention.
                   </p>
                 </div>
-                <div className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3.5 py-1.5 text-[11px] tracking-wide text-white/36">
+                <div className="rounded-full border border-[#2B2B2B]/8 bg-[#F7F1E7] px-3.5 py-1.5 text-[11px] tracking-wide text-[#7A6851]">
                   {filteredEmails.length} visible
                 </div>
               </div>
@@ -442,11 +456,11 @@ export default function InboxPage() {
                   : null}
 
                 {!loading && filteredEmails.length === 0 ? (
-                  <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/[0.06] bg-white/[0.02] px-8 text-center">
-                    <h3 className="text-[22px] font-semibold tracking-[-0.03em] text-white/94">
+                  <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[30px] border border-dashed border-[#2B2B2B]/8 bg-white/55 px-8 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                    <h3 className="font-serif text-[30px] tracking-[-0.04em] text-ink">
                       No threads match that prompt
                     </h3>
-                    <p className="mt-4 max-w-sm text-sm leading-7 text-white/38">
+                    <p className="mt-4 max-w-sm text-sm leading-7 text-muted">
                       Try a broader phrasing like "recruiters", "deadlines", or
                       "follow up".
                     </p>
@@ -479,23 +493,24 @@ export default function InboxPage() {
               transition={{ duration: isResizing ? 0.08 : 0.16 }}
             >
               <motion.div
-                className={`absolute inset-y-8 left-1/2 w-px -translate-x-1/2 rounded-full bg-white/0 ${
-                  isResizing ? "shadow-[0_0_14px_rgba(124,92,255,0.45)]" : ""
+                className={`absolute inset-y-8 left-1/2 w-px -translate-x-1/2 rounded-full ${
+                  isResizing ? "shadow-[0_0_10px_rgba(221,107,87,0.18)]" : ""
                 }`}
                 animate={{
                   backgroundColor: isResizing
-                    ? "rgba(124, 92, 255, 0.88)"
+                    ? "rgba(221, 107, 87, 0.72)"
                     : isDividerHovered
-                      ? "rgba(255,255,255,0.18)"
-                      : "rgba(255,255,255,0.08)",
+                      ? "rgba(122, 104, 81, 0.28)"
+                      : "rgba(122, 104, 81, 0.12)",
                   boxShadow: isResizing
-                    ? "0 0 0 1px rgba(124,92,255,0.14), 0 0 22px rgba(124,92,255,0.35)"
+                    ? "0 0 0 1px rgba(221,107,87,0.08), 0 0 18px rgba(221,107,87,0.14)"
                     : isDividerHovered
-                      ? "0 0 0 1px rgba(255,255,255,0.03), 0 0 14px rgba(255,255,255,0.06)"
-                      : "0 0 0 1px rgba(255,255,255,0.02)",
+                      ? "0 0 0 1px rgba(122,104,81,0.05), 0 0 12px rgba(122,104,81,0.05)"
+                      : "0 0 0 1px rgba(122,104,81,0.03)",
                 }}
                 transition={{ duration: isResizing ? 0.05 : 0.18 }}
               />
+
               <motion.div
                 className="relative z-10 flex h-14 w-3 items-center justify-center"
                 animate={{
@@ -505,9 +520,9 @@ export default function InboxPage() {
                 transition={{ duration: isResizing ? 0.08 : 0.16 }}
               >
                 <div className="flex flex-col gap-1">
-                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-white/35"}`} />
-                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-white/35"}`} />
-                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-white/35"}`} />
+                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-[#B6A48E]"}`} />
+                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-[#B6A48E]"}`} />
+                  <span className={`block h-1 w-1 rounded-full ${isResizing ? "bg-accent" : "bg-[#B6A48E]"}`} />
                 </div>
               </motion.div>
             </motion.div>
@@ -517,7 +532,10 @@ export default function InboxPage() {
             layout
             className={`min-h-0 min-w-0 flex-1 ${layoutMode === "mobile" ? "" : "overflow-y-auto pr-1"}`}
             style={{
-              transition: isResizing || layoutMode === "mobile" ? "none" : "all 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+              transition:
+                isResizing || layoutMode === "mobile"
+                  ? "none"
+                  : "all 220ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
             <AIWorkspace
@@ -529,8 +547,8 @@ export default function InboxPage() {
               onGenerateDraft={handleGenerateDraft}
               isDraftLoading={draftLoading}
               draftError={draftError}
-              isCompact={workspaceIsCompact}
-              isNarrow={workspaceIsNarrow}
+              isCompact={workspaceWidth < 520}
+              isNarrow={workspaceWidth < 420}
             />
           </motion.div>
         </div>

@@ -13,15 +13,15 @@ export default function SearchPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <div className="w-full max-w-3xl rounded-[32px] border border-white/10 bg-white/[0.04] p-10 text-center shadow-halo">
+      <div className="w-full max-w-3xl rounded-[36px] border border-[#2B2B2B]/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(246,240,230,0.9))] p-10 text-center shadow-[0_24px_50px_rgba(111,88,60,0.08),inset_0_1px_0_rgba(255,255,255,0.82)]">
         <div className="mx-auto max-w-lg">
-          <p className="text-xs uppercase tracking-[0.26em] text-white/35">
+          <p className="text-xs uppercase tracking-[0.26em] text-[#7A6851]">
             Search
           </p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+          <h1 className="mt-4 font-serif text-[40px] tracking-[-0.05em] text-ink">
             Semantic inbox search comes next
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/45">
+          <p className="mt-4 text-sm leading-7 text-muted">
             The reusable shell is in place. For this pass, the detailed work is
             focused on the Inbox experience first.
           </p>
@@ -31,7 +31,7 @@ export default function SearchPage() {
           {prompts.map((prompt) => (
             <div
               key={prompt}
-              className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-white/58"
+              className="rounded-[22px] border border-[#2B2B2B]/8 bg-[#FCFAF6] px-4 py-4 text-sm text-[#5C5248] shadow-[0_10px_24px_rgba(115,95,71,0.05)]"
             >
               {prompt}
             </div>
