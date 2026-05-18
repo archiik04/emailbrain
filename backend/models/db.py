@@ -16,14 +16,17 @@ class Email(Base):
     is_sent      = Column(Boolean, default=False)
     embedded     = Column(Boolean, default=False)
     triage_score = Column(Integer, default=0)
+    warning_flag = Column(Boolean, default=False)
 
 class Contact(Base):
     __tablename__ = "contacts"
     email          = Column(String, primary_key=True)
-    name           = Column(String, default="")
-    last_seen      = Column(DateTime)
-    avg_reply_days = Column(Integer, default=0)
-    topics         = Column(Text, default="")
+    name             = Column(String, default="")
+    last_seen        = Column(DateTime)
+    last_interaction = Column(DateTime)
+    avg_reply_days   = Column(Integer, default=0)
+    topics           = Column(Text, default="")
+    priority_score   = Column(Integer, default=0)
 
 class FollowUp(Base):
     __tablename__ = "followups"

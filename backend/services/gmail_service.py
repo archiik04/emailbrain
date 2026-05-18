@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 load_dotenv()
 
-GWS      = os.getenv("GWS_PATH", r"C:\Users\HP\AppData\Roaming\npm\gws.cmd")
+GWS      = os.getenv("GWS_PATH", "gws")
 MY_EMAIL = os.getenv("EMAIL_ADDRESS", "")
 
 from models.db import Email, engine

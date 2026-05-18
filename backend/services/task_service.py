@@ -5,7 +5,7 @@ import subprocess
 from dotenv import load_dotenv
 load_dotenv()
 
-GWS = os.getenv("GWS_PATH", r"C:\Users\HP\AppData\Roaming\npm\gws.cmd")
+GWS = os.getenv("GWS_PATH", "gws")
 
 from utils.prompts import TASKS_PROMPT
 

@@ -1,11 +1,14 @@
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FilePenLine,
   Inbox,
   Search,
   TimerReset,
+  UserPlus
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { requestJson } from "../api/client";
 
 const navItems = [
   { to: "/inbox", label: "Inbox", icon: Inbox },
@@ -15,6 +18,20 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const [staleContact, setStaleContact] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    requestJson({ method: "get", url: "/contacts/stale" })
+      .then((res) => {
+        if (mounted && res.data?.stale_contacts?.length > 0) {
+          setStaleContact(res.data.stale_contacts[0]);
+        }
+      })
+      .catch((err) => console.error("Failed to load stale contacts", err));
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <aside className="hidden h-full w-[88px] shrink-0 rounded-[32px] border border-[#2B2B2B]/10 bg-[linear-gradient(180deg,rgba(255,252,247,0.92),rgba(244,238,228,0.96))] p-4 shadow-[0_18px_42px_rgba(115,95,71,0.08),inset_0_1px_0_rgba(255,255,255,0.82)] xl:flex xl:w-[272px] xl:flex-col">
       <motion.div
@@ -71,7 +88,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="hidden rounded-[28px] border border-[#2B2B2B]/8 bg-white/55 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] xl:block">
+      <div className="mt-auto hidden rounded-[28px] border border-[#2B2B2B]/8 bg-white/55 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] xl:block">
         <p className="text-[11px] uppercase tracking-[0.24em] text-[#7A6851]/75">
           Workspace
         </p>
@@ -83,6 +100,36 @@ export default function Sidebar() {
           and a calm assistant alongside.
         </p>
       </div>
+
+      <AnimatePresence>
+        {staleContact && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="mt-4 hidden rounded-[24px] border border-[#D45F4D]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(248,226,221,0.9))] p-4 shadow-[0_12px_24px_rgba(221,107,87,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] xl:block"
+          >
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#D96B57]">
+                <UserPlus className="h-3.5 w-3.5" />
+                Stale Contact
+              </p>
+              <button
+                onClick={() => setStaleContact(null)}
+                className="text-muted hover:text-ink"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-2.5 text-sm font-semibold tracking-tight text-ink">
+              Reconnect with {staleContact.name || staleContact.email}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted line-clamp-2">
+              Antigravity Mode suggests a check-in.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </aside>
   );
 }

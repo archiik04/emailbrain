@@ -5,6 +5,9 @@ chromadb/
 # Your personal tone profile (private)
 backend/tone_profile.json
 
+# Local RAG context files (private)
+backend/assets/
+
 # Python cache
 __pycache__/
 *.pyc

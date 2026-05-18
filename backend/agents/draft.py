@@ -7,6 +7,7 @@ from sqlalchemy import select
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.db import Email, engine
+from services.context_service import get_relevant_context
 
 TONE_PROFILE_PATH = os.path.join(os.path.dirname(__file__), "..", "tone_profile.json")
 
@@ -130,6 +131,10 @@ def draft_reply(subject: str, sender: str, body: str, tone_override: str = None)
     """
     sender_name = extract_first_name(sender)
     profile = load_tone_profile()
+    
+    # Context Injection
+    local_context = get_relevant_context(body)
+    context_section = f"\nRelevant Local Context:\n{local_context}\n" if local_context else ""
 
     prompt = f"""You are drafting an email reply on behalf of the user.
 
@@ -137,7 +142,7 @@ Sender's name: {sender_name if sender_name else "there"}
 Email subject: {subject}
 Original email body:
 {body[:800]}
-
+{context_section}
 User's writing style:
 - Average email length: {profile.get('avg_length', 'medium')} words
 - Tone: {tone_override or profile.get('tone', 'professional')}
@@ -154,6 +159,7 @@ Instructions:
 - Do NOT add [Your Name] or placeholders — leave sign-off as just the closing word (e.g. "Best,")
 - Keep length consistent with user's avg_length
 - Tone override (if set): {tone_override or "match user style"}
+- Use the provided Relevant Local Context to ensure the draft is factually accurate to the user's real-world constraints.
 
 Write only the email body. No subject line. No metadata."""
 

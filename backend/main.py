@@ -6,6 +6,7 @@ from routes.inbox     import router as inbox_router
 from routes.search    import router as search_router
 from routes.drafts    import router as drafts_router
 from routes.followups import router as followups_router
+from routes.contacts  import router as contacts_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,6 +35,7 @@ app.include_router(inbox_router)
 app.include_router(search_router)
 app.include_router(drafts_router)
 app.include_router(followups_router)
+app.include_router(contacts_router)
 
 @app.get("/")
 def root():

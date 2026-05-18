@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone
 import ollama
 import chromadb
 from sqlalchemy.orm import Session
@@ -9,6 +10,51 @@ from models.db import Email, engine
 
 chroma = chromadb.PersistentClient(path="./chromadb")
 collection = chroma.get_or_create_collection("emails")
+
+def apply_recency_boost(results: list) -> list:
+    """
+    Boosts score for recent emails so newer ones 
+    rank higher when similarity scores are close.
+    
+    Boost logic:
+      - Email from last 7 days  → score × 2.0
+      - Email from last 30 days → score × 1.5
+      - Email from last 90 days → score × 1.2
+      - Older than 90 days      → score × 1.0 (no boost)
+    """
+    now = datetime.now(timezone.utc)
+    
+    for result in results:
+        try:
+            # Parse date from result dict
+            date_str = result.get("date", "")
+            if not date_str:
+                continue
+                
+            email_date = datetime.fromisoformat(date_str)
+            
+            # Make timezone-aware if naive
+            if email_date.tzinfo is None:
+                email_date = email_date.replace(tzinfo=timezone.utc)
+            
+            days_old = (now - email_date).days
+            
+            if days_old <= 7:
+                boost = 2.0
+            elif days_old <= 30:
+                boost = 1.5
+            elif days_old <= 90:
+                boost = 1.2
+            else:
+                boost = 1.0
+                
+            result["score"] = round(result["score"] * boost, 3)
+            result["days_old"] = days_old  # useful for debugging
+            
+        except Exception:
+            continue
+    
+    return results
 
 def parse_intent(query: str) -> dict:
     """
@@ -85,7 +131,7 @@ def search_emails(query: str, top_k: int = 15) -> list:
                 .limit(top_k)
             ).scalars().all()
             
-            return [
+            results = [
                 {
                     "message_id": e.message_id,
                     "subject":    e.subject,
@@ -108,7 +154,7 @@ def search_emails(query: str, top_k: int = 15) -> list:
                 .limit(top_k)
             ).scalars().all()
             
-            return [
+            results = [
                 {
                     "message_id": e.message_id,
                     "subject":    e.subject,
@@ -121,7 +167,12 @@ def search_emails(query: str, top_k: int = 15) -> list:
             ]
             
     else:
-        return existing_vector_search(query, top_k)
+        results = existing_vector_search(query, top_k)
+        
+    # Apply recency boost and sort
+    results = apply_recency_boost(results)
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
 
 def search_and_summarise(query: str) -> str:
     """Search emails and ask Mistral to summarise what it found."""
@@ -136,21 +187,24 @@ def search_and_summarise(query: str) -> str:
         return "No emails found matching that search."
 
     # Format strictly to prevent hallucinating un-returned emails
+    today = datetime.now().strftime("%B %d, %Y")
     email_list = "\n".join([
-        f"- From: {r['sender']} | Subject: {r['subject']} | Date: {r['date']}"
+        f"- [{r['date'][:10]}] From: {r['sender']} | Subject: {r['subject']}"
         for r in hits
     ])
     
     SUMMARY_PROMPT = f"""
+Today's date is {today}.
 The user searched for: "{query}"
 
-Here are the matching emails:
+Here are the most relevant matching emails (newest first):
 {email_list}
 
-Write a 2-3 sentence summary of what these emails contain.
-Only describe what is in the list above. 
-Do not mention emails that are not listed.
-If the list is empty, say "No emails found matching that search."
+Write a 2-3 sentence summary. 
+Mention specific dates when relevant.
+Highlight the most RECENT matches first.
+If all results are older than 60 days, note that no recent emails matched.
+Only describe emails in the list above.
 """
 
     response = ollama.chat(

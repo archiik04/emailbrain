@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.db import Email, engine
+from services.context_service import has_local_context
 
 TRIAGE_PROMPT = """You are an email triage assistant. Score this email's urgency from 1-10.
 
@@ -59,6 +60,8 @@ def serialize_email(email: Email) -> dict:
         "score": email.triage_score,
         "body": email.body or "",
         "preview": preview,
+        "warning_flag": email.warning_flag,
+        "has_context": has_local_context(email.body or "")
     }
 
 

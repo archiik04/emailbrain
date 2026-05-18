@@ -82,6 +82,16 @@ export default function EmailCard({ email, isActive, onClick }) {
           <span className="rounded-full border border-[#2B2B2B]/8 bg-[#F7F1E7] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#7A6851]">
             {email.unread ? "Unread" : "Reviewed"}
           </span>
+          {email.has_context && (
+            <span className="rounded-full border border-[#A77B28]/20 bg-[#F9F0CC] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#A77B28]">
+              Context Linked
+            </span>
+          )}
+          {email.warning_flag && (
+            <span className="rounded-full border border-[#D96B57]/20 bg-[#F8E2DD] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#D96B57]">
+              Conflict Warning
+            </span>
+          )}
         </div>
         <span className="text-[11px] tracking-wide text-[#8A7D6A]">
           Priority score {email.score}/10

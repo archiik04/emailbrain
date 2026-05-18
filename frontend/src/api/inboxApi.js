@@ -55,6 +55,8 @@ const normalizeEmail = (email, index = 0) => {
     unread: typeof email.unread === "boolean" ? email.unread : index < 2,
     date: email.date || "",
     displayDate: formatDisplayDate(email.date),
+    has_context: email.has_context || false,
+    warning_flag: email.warning_flag || false,
   };
 };
 
