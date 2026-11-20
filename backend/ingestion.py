@@ -29,16 +29,19 @@ def detect_conflicts(batch_ids, batch_docs, batch_meta, session):
     # We need embeddings to query ChromaDB. Since embed_batch upserts, we can query ChromaDB directly
     # Wait, we can get embeddings by querying the DB since they were just upserted.
     results = collection.get(ids=batch_ids, include=["embeddings"])
-    embeddings = results.get("embeddings", [])
-    if not embeddings:
+    # Chroma returns embeddings as a NumPy array, and not necessarily in the
+    # order of `ids`, so pair each embedding with the id it came back with.
+    embeddings = results.get("embeddings")
+    if embeddings is None or len(embeddings) == 0:
         return
+    embedding_by_id = dict(zip(results["ids"], embeddings))
 
     for i, msg_id in enumerate(batch_ids):
-        if i >= len(embeddings) or not embeddings[i]:
+        embedding = embedding_by_id.get(msg_id)
+        if embedding is None or len(embedding) == 0:
             continue
-            
         matches = collection.query(
-            query_embeddings=[embeddings[i]],
+            query_embeddings=[list(embedding)],
             n_results=4,
             include=["documents", "metadatas", "distances"]
         )

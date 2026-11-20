@@ -11,7 +11,8 @@ const API_CANDIDATES = unique([
 ]);
 
 const RETRYABLE_STATUS_CODES = new Set([404, 405, 502, 503, 504]);
-const DEFAULT_TIMEOUT_MS = 15000;
+// Local Mistral can take well over 15s per call, so allow up to 2 minutes.
+const DEFAULT_TIMEOUT_MS = 120000;
 
 let activeBaseUrl = process.env.REACT_APP_API_URL || null;
 
@@ -43,7 +44,9 @@ const normalizeAxiosError = (error, baseUrl, endpoint, attempts) => {
     endpoint,
     status,
     details,
-    isNetworkError: !error.response,
+    // A timeout means the server is up but slow; retrying on another URL
+    // would just send the same LLM request to the same server again.
+    isNetworkError: !error.response && error.code !== "ECONNABORTED",
     attempts,
   });
 };

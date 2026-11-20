@@ -26,29 +26,44 @@ def run_gws(args: list) -> str:
     return result.stdout or ""
 
 def get_inbox_ids(max_emails: int = 50) -> list:
-    raw = run_gws(["gmail", "+triage"])
-    lines = raw.strip().split("\n")
-    data_lines = [
-        l for l in lines
-        if "─" not in l
-        and "date" not in l.lower()
-        and "from" not in l.lower()
-        and l.strip()
-    ]
-    msg_ids = []
-    for line in data_lines[:max_emails]:
-        for part in line.split():
-            if len(part) == 16 and all(c in "0123456789abcdef" for c in part):
-                msg_ids.append(part)
-                break
-    return msg_ids
+    # Recent inbox AND sent mail (sent mail feeds the tone profile and follow-ups).
+    raw = run_gws([
+        "gmail", "+triage",
+        "--max", str(max_emails),
+        "--query", "in:inbox OR in:sent",
+        "--format", "json",
+    ])
+    try:
+        messages = json.loads(raw).get("messages", [])
+    except (json.JSONDecodeError, AttributeError):
+        return []
+    return [m["id"] for m in messages if m.get("id")]
+
+def _format_address(value) -> str:
+    """gws returns addresses as {"name", "email"} objects; store them as 'Name <email>'."""
+    if isinstance(value, dict):
+        name, addr = value.get("name"), value.get("email", "")
+        return f"{name} <{addr}>" if name else addr
+    if isinstance(value, list):
+        return ", ".join(_format_address(v) for v in value)
+    return value or ""
 
 def fetch_email(msg_id: str) -> dict | None:
     try:
-        raw = run_gws(["gmail", "+read", msg_id])
-        return json.loads(raw)
-    except:
+        raw = run_gws(["gmail", "+read", "--id", msg_id, "--headers", "--format", "json"])
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
         return None
+    if "error" in data:
+        return None
+    return {
+        "from":     _format_address(data.get("from")),
+        "to":       _format_address(data.get("to")),
+        "subject":  data.get("subject") or "(no subject)",
+        "date":     data.get("date", ""),
+        "body":     data.get("body_text") or "",
+        "threadId": data.get("thread_id") or msg_id,
+    }
 
 def send_reply(msg_id: str, body: str) -> bool:
     result = run_gws(["gmail", "+reply", msg_id, "--body", body])
@@ -69,7 +84,8 @@ def store_email(msg_id: str, session) -> bool:
     date_str = data.get("date", "")
     try:
         from email.utils import parsedate_to_datetime
-        date = parsedate_to_datetime(date_str)
+        # Store as naive local time; the agents compare against datetime.now().
+        date = parsedate_to_datetime(date_str).astimezone().replace(tzinfo=None)
     except:
         date = datetime.now()
 
