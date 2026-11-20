@@ -1,50 +1,49 @@
 import os
 import sys
 
-import ollama
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.db import Email, engine
 from services.context_service import has_local_context
+from services.llm import llm_precise
 
-TRIAGE_PROMPT = """You are an email triage assistant. Score this email's urgency from 1-10.
 
-Rules:
-- 9-10: Needs reply TODAY (deadlines, urgent requests, important people)
-- 7-8:  Should reply within 24 hours
-- 5-6:  Reply within a few days
-- 3-4:  Low priority, reply when convenient
-- 1-2:  Newsletter, notification, no reply needed
+class TriageScore(BaseModel):
+    """Urgency score for one email."""
+    score: int = Field(ge=1, le=10, description="Urgency from 1 (no reply needed) to 10 (reply today)")
 
-Email:
-From: {sender}
-Subject: {subject}
-Body: {body}
 
-Respond with ONLY a single number 1-10. Nothing else."""
+TRIAGE_PROMPT = ChatPromptTemplate.from_messages([
+    ("system",
+     "You are an email triage assistant. Score each email's urgency from 1 to 10.\n\n"
+     "Rules:\n"
+     "- 9-10: Needs reply TODAY (deadlines, urgent requests, important people)\n"
+     "- 7-8:  Should reply within 24 hours\n"
+     "- 5-6:  Reply within a few days\n"
+     "- 3-4:  Low priority, reply when convenient\n"
+     "- 1-2:  Newsletter, notification, no reply needed"),
+    ("human", "From: {sender}\nSubject: {subject}\nBody: {body}"),
+])
+
+# LCEL chain: prompt -> local Mistral -> schema-validated TriageScore.
+# with_structured_output makes Ollama constrain generation to the JSON schema,
+# so a "10" can no longer be mis-parsed (the old first-digit parser turned it into 1).
+triage_chain = TRIAGE_PROMPT | llm_precise.with_structured_output(TriageScore)
 
 
 def score_email(subject: str, sender: str, body: str) -> int:
-    """Ask Mistral to score one email's urgency."""
+    """Score one email's urgency with the triage chain (falls back to 5 on failure)."""
     try:
-        response = ollama.chat(
-            model="mistral",
-            messages=[
-                {
-                    "role": "user",
-                    "content": TRIAGE_PROMPT.format(
-                        sender=sender,
-                        subject=subject,
-                        body=body[:500],
-                    ),
-                }
-            ],
-        )
-        raw = response["message"]["content"].strip()
-        score = int("".join(filter(str.isdigit, raw))[:1] or "5")
-        return max(1, min(10, score))
+        result = triage_chain.invoke({
+            "sender": sender,
+            "subject": subject,
+            "body": (body or "")[:500],
+        })
+        return result.score
     except Exception as exc:
         print(f"  Scoring failed: {exc}")
         return 5

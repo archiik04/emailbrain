@@ -1,15 +1,66 @@
-import ollama
 import json
 import os
 import re
+from typing import Literal
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from models.db import Email, engine
 from services.context_service import get_relevant_context
+from services.llm import llm_precise, llm_writer
 
 TONE_PROFILE_PATH = os.path.join(os.path.dirname(__file__), "..", "tone_profile.json")
+
+
+class ToneProfile(BaseModel):
+    """The user's writing style, learned from their sent mail."""
+    formality: Literal["casual", "neutral", "formal"]
+    avg_length: Literal["short", "medium", "long"]
+    opener_style: str = Field(description="How they typically open emails, in about 5 words")
+    closer_style: str = Field(description="How they typically close emails, in about 5 words")
+    tone: str = Field(description="Overall tone, in about 5 words")
+    common_phrases: list[str] = Field(description="Up to 3 phrases they often use")
+
+
+TONE_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", "You analyse writing style. All the emails below were written by the same person."),
+    ("human", "{samples}\n\nDescribe this person's writing style."),
+])
+
+# LCEL chain: prompt -> local Mistral -> validated ToneProfile.
+tone_chain = TONE_PROMPT | llm_precise.with_structured_output(ToneProfile)
+
+DRAFT_PROMPT = ChatPromptTemplate.from_messages([
+    ("system",
+     "You draft email replies on behalf of the user, in their own voice.\n\n"
+     "User's writing style:\n"
+     "- Formality: {formality}\n"
+     "- Typical length: {avg_length}\n"
+     "- Typical opener: {opener_style}\n"
+     "- Typical closer: {closer_style}\n"
+     "- Tone: {tone}\n"
+     "- Phrases they use: {common_phrases}\n"
+     "{style_examples}"
+     "{context_section}\n"
+     "Instructions:\n"
+     "- {greeting_rule}\n"
+     "- Never use the user's own name as the greeting\n"
+     "- Reply directly to the content of the email and match the style above\n"
+     "- End with a sign-off from the user's style, just the closing word (e.g. \"Best,\"); no [Your Name] or other placeholders\n"
+     "- If local context is given, keep the draft factually consistent with it\n"
+     "- Write only the email body. No subject line, no preamble."),
+    ("human",
+     "The user RECEIVED this email:\n"
+     "From: {sender}\nSubject: {subject}\n\n{body}\n\n"
+     "Write the user's reply to this sender, as the user. Do not continue or rewrite the sender's email."),
+])
+
+# LCEL chain: prompt -> local Mistral -> plain text.
+draft_chain = DRAFT_PROMPT | llm_writer | StrOutputParser()
 
 def build_tone_profile() -> dict:
     """
@@ -45,29 +96,9 @@ def build_tone_profile() -> dict:
     for i, e in enumerate(good_samples[:10]):
         samples += f"\n--- Email {i+1} ---\n{e.body[:400]}\n"
 
-    prompt = f"""Analyse these emails written by the same person and extract their writing style.
-
-{samples}
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{{
-  "formality": "casual|neutral|formal",
-  "avg_length": "short|medium|long",
-  "opener_style": "describe how they typically open emails in 5 words",
-  "closer_style": "describe how they typically close emails in 5 words",
-  "tone": "describe overall tone in 5 words",
-  "common_phrases": ["phrase1", "phrase2", "phrase3"]
-}}"""
-
     try:
-        response = ollama.chat(
-            model="mistral",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = response["message"]["content"].strip()
-        # strip markdown fences if Mistral adds them
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        profile = json.loads(raw)
+        # Structured output replaces the old "strip ``` fences, then json.loads" parsing.
+        profile = tone_chain.invoke({"samples": samples}).model_dump()
         print(f"  Tone: {profile.get('tone')}")
         print(f"  Formality: {profile.get('formality')}")
         print(f"  Length: {profile.get('avg_length')}")
@@ -105,6 +136,10 @@ def extract_first_name(sender: str) -> str:
       "no-reply@accounts.google.com"            → "" (skip greeting)
       "LinkedIn <messages@linkedin.com>"        → "LinkedIn" (use as-is)
     """
+    # Automated senders ("Jobvite Notification <no-reply@jobvite.com>") get no name.
+    if re.search(r"no-?reply|notifications?@|newsletters?", sender, re.IGNORECASE):
+        return ""
+
     # Try "Display Name <email>" format first
     name_match = re.match(r'^([^<@]+?)\s*<', sender.strip())
     if name_match:
@@ -131,43 +166,40 @@ def draft_reply(subject: str, sender: str, body: str, tone_override: str = None)
     """
     sender_name = extract_first_name(sender)
     profile = load_tone_profile()
-    
-    # Context Injection
+
     local_context = get_relevant_context(body)
-    context_section = f"\nRelevant Local Context:\n{local_context}\n" if local_context else ""
 
-    prompt = f"""You are drafting an email reply on behalf of the user.
+    return draft_chain.invoke({
+        "formality":      tone_override or profile.get("formality", "neutral"),
+        "avg_length":     profile.get("avg_length", "medium"),
+        "opener_style":   profile.get("opener_style", "friendly"),
+        "closer_style":   profile.get("closer_style", "thanks"),
+        "tone":           profile.get("tone", "professional"),
+        "common_phrases": ", ".join(profile.get("common_phrases", [])),
+        "style_examples": _style_examples(),
+        "context_section": f"\nRelevant local context:\n{local_context}\n" if local_context else "",
+        "greeting_rule":  (f'Open with "Hi {sender_name},"' if sender_name
+                           else 'Open with "Hi," or "Hello," (no name is known)'),
+        "sender":  sender,
+        "subject": subject,
+        "body":    (body or "")[:800],
+    }).strip()
 
-Sender's name: {sender_name if sender_name else "there"}
-Email subject: {subject}
-Original email body:
-{body[:800]}
-{context_section}
-User's writing style:
-- Average email length: {profile.get('avg_length', 'medium')} words
-- Tone: {tone_override or profile.get('tone', 'professional')}
-- Typical opener: {profile.get('opener_style', 'friendly')}
-- Typical closer: {profile.get('closer_style', 'thanks')}
 
-Instructions:
-- Open with "Hi {sender_name if sender_name else 'there'}," (use their actual name)
-- If sender_name is empty or "there", start with "Hi," or "Hello,"
-- Never use the user's own name as the greeting
-- Match the user's writing style described above
-- Reply directly to the content of the email
-- End with an appropriate sign-off from the user's style
-- Do NOT add [Your Name] or placeholders — leave sign-off as just the closing word (e.g. "Best,")
-- Keep length consistent with user's avg_length
-- Tone override (if set): {tone_override or "match user style"}
-- Use the provided Relevant Local Context to ensure the draft is factually accurate to the user's real-world constraints.
-
-Write only the email body. No subject line. No metadata."""
-
-    response = ollama.chat(
-        model="mistral",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response["message"]["content"].strip()
+def _style_examples(limit: int = 2) -> str:
+    """Few-shot examples: the user's most recent real sent emails (20+ words)."""
+    with Session(engine) as session:
+        sent = session.execute(
+            select(Email)
+            .where(Email.is_sent == True)
+            .order_by(Email.date.desc())
+            .limit(20)
+        ).scalars().all()
+    samples = [e.body[:400] for e in sent if len((e.body or "").split()) >= 20][:limit]
+    if not samples:
+        return ""
+    joined = "\n---\n".join(samples)
+    return f"\nExamples of emails the user actually wrote:\n{joined}\n"
 
 if __name__ == "__main__":
     # step 1: build tone profile from your sent mail
